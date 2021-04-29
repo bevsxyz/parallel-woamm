@@ -31,11 +31,11 @@ $$
 P^{(k+1)}=  P^{(k)}_{rnd}-A\cdot \overline{D}
 $$
 
-where $P$ indicates a position vector of the population, $P_{rnd}$ is a vector
+where $P$ indicate a position vector of the population, $P_{rnd}$ is a vector
 which is chosen randomly from the present population, the current
 iteration is denoted by $k$, $\overline{D}$ is the distance between the random and
 current individual of the population, the dot $(\cdot)$ operator indicates the
-element by element multiplication process, and $| |$ is used to define
+element by element multiplication process and $| |$ is used to define
 absolute value.
 
 The two parameters, known as coefficient vectors, $A$, and $C$ are
@@ -46,7 +46,7 @@ $$A = 2a_1 \times rnd - a_1$$
 $$C = 2 \times rnd$$
 
 where the value of $a_1$ is a number decreased linearly from 2 to 0 during
-iteration, and $rnd$ is a random number within the interval.
+iteration and $rnd$ is a random number within the interval.
 
 #### Encircling the prey
 
@@ -58,7 +58,7 @@ $$
 P^{(k+1)}= P^{(k)}_{best} A\cdot \overline{D}
 $$
 
-where $P_{best}$ is the current best solution.
+Where $P_{best}$ is the current best solution.
 
 #### Bubble-net attacking strategy
 
@@ -84,9 +84,8 @@ during the iteration process, and $rnd$ is an arbitrary number in the range
 
 During the search process, switching between the exploration and
 exploitation process is chosen depending on the value of $|A|$. If $A| \geq 1$,
-the exploration process comes in existence, which enables global search
-by using Eq. 1 and 2. When $|A| < 1$, then updating the positions of in­
-dividuals is performed by using eq. 6 or 8. Depending on a probability
+the exploration process comes into existence, enabling global search
+by using Eq. 1 and 2. When $|A| < 1$, then updating the positions of individuals is performed by using eq. 6 or 8. Depending on a probability
 value $\beta$, which is 0.5 for each strategy WOA process switches between
 encircling prey or bubble-net attacking strategy.
 
@@ -113,7 +112,7 @@ encircling prey or bubble-net attacking strategy.
         Update $A,C,l \And \beta$\;
         \eIf{$\beta < 0.5$}{
             \eIf{$|A| \geq 1$}{
-                Select a random	\textit{search-agent} $P_{rnd}$\;
+                Select a random \textit{search-agent} $P_{rnd}$\;
                 Update the position of current \textit{search-agent} by eq.2
             }{
                 Update the position of current \textit{search-agent} by eq.6
@@ -191,7 +190,7 @@ A single block will execute the whole algorithm with threads equal to the popula
 1. Each thread will execute commands 1 to 4 in parallel. (Will store the population values in a shared array.
 2. Inside the while loop, all threads synchronize
 3. Each thread copies the shared array locally.  ( A modulo-based for loop is used to avoid bank conflicts.)
-4. Then each thread executes the optimization codes wrt the local population array except that there would be sync event before WOA.
+4. Then, each thread executes the local population array's optimization codes except that there would be a sync event before WOA.
 5. Finally, write the local array to a shared array, with the minimum value for each individual.
 6. Loop.
 7. After the while loop ends, the device will return the best solution to the host.
@@ -207,26 +206,21 @@ A single block will execute the whole algorithm with threads equal to the popula
     Copy the $P_i$ shared array to a local array\;
     \For{thread}{
         Select two other \textit{search-agent} $(P_m \And P_n)$ randomly where $P_i \neq P_m \neq P_n$\;
-        \eIf{fitness ($P_m$)< fitness ($P_n$)}{
-            Calculate the new value of $P_i \And P_n$ using eq.10 and eq.11 respectively.
-        }{
-            Calculate new value of $P_i \And P_n$ using eq.12 and eq.13 respectively.
-        }
+        Initialize array of indexes ind = $[P_m,P_n]$\;
+        Set int index = $P_m < P_n$\;
+        Calculate the new value of $P_i \And population[ind[index]]$ using eq.10 and eq.11\;
         Calculate the fitness of $P_i^{k+1}$ and $P_m^{k+1}$ or $P_n^{k+1}$\;
         Update the value of $P_i$ and $P_n$ or $P_m$ if the new fitness value is minimum (for minimization problem).\;
     }
-    Syncronize local array with shared array use min value of $P_i$\;
+    Syncronize local array with shared array use min value of $P_i$ or the shuffle cuda operation could be faster\;
     Calculate $P_{best}$\;
     \#Procedure WOA starts from here\;
     \For{every \textit{search-agent}}{
         Update $A,C,l \And \beta$\;
         \eIf{$\beta < 0.5$}{
-            \eIf{$|A| \geq 1$}{
-                Select a random	\textit{search-agent} $P_{rnd}$\;
-                Update the position of current \textit{search-agent} by eq.2
-            }{
-                Update the position of current \textit{search-agent} by eq.6
-            }
+            Array = $[P_{rnd},P_{best}]$
+            Index int ind = $|A| \geq 1$
+            Update the position of current \textit{search-agent} by eq.2
         }{
             Update the position of current \textit{search-agent} by eq.8
         }
@@ -238,13 +232,17 @@ A single block will execute the whole algorithm with threads equal to the popula
  \caption{Pseudo-code of the GPU WOAmM algorithm.}
 \end{algorithm}
 
+Random numbers are a bit troublesome. We will use the cuda library for random number and use separate seed for each block.
+
+When random individuals are required we will resort to picking random element from an array of indices with elemination to avoid repeatation.
+
 ### Optimizations
 
 1. Use floats for fitness calculation.
 2. The population size can be set to equal the warp size 32.
 3. The local copy of the population array is a trick to avoid bank conflicts, which could be feasible since the population size is small. The modulo operation will not slow the execution since we use a constant value for population size.
-4. Within device code, avoid pointer aliasing.
-5. We can reduce the if1 and if3 predicate to a min operation in order to avoid warp divergence.
+4. Within the device code, avoid pointer aliasing.
+5. We can reduce the if1 and if3 predicate to a min operation to avoid warp divergence.
 6. Use implicit synchronization within warp instead of the sync operation.
 7. Could dynamic kernel initiation help for two or three threads?
 
@@ -254,3 +252,6 @@ Few strategies to improve the stochasticity of the population, and thereby, the 
 
 1. Loop through each component OA after syncing the local array to the shared array. Two iterations could probably give us results similar to the sequential algorithm.
 2. Run multiple blocks and take the best solution (an even better option would be to add this as an extra warp in the original kernel).
+
+I prefer the second option to the first.
+
