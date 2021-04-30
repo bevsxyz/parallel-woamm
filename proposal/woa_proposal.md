@@ -2,6 +2,12 @@
 title: Parallel Enhanced Whale Optimization Algorithm
 author: Bevan Stanely
 autoEqnLabels: true
+bibliography: ref.bib
+link-citations: true
+color-links: true
+linkcolor: blue
+urlcolor: blue
+citecolor: blue
 header-includes:
   - \usepackage[ruled,vlined,linesnumbered]{algorithm2e}
 ---
@@ -12,11 +18,13 @@ To develop a parallel GPU implementation of the recently proposed Enhanced Whale
 
 ## Background
 
-The Whale Optimization Algorithm (WOA) is a meta-heuristic optimization algorithm developed by Mirjalili and Lewis. It uses the humpback whales' hunting mechanism. Like most optimization algorithms, it works by spawning a population of agents and engaging them in exploration and exploitation phases. The exploratory phase helps to explore the search space extensively, whereas the exploitatory step refines promising solutions from the exploratory stage.  Though effective, WOA may suffer from the low exploration of the search space. An enhanced WOA (WOAmM), proposed recently by Chakraborty et al., adds the mutualism phase of Symbiotic Organisms Search (SOS)  to WOA to improve the exploration.
+The Whale Optimization Algorithm (WOA) is a meta-heuristic optimization algorithm developed by @mirjaliliWhaleOptimizationAlgorithm2016. It uses the humpback whales' hunting mechanism. Like most optimization algorithms, it works by spawning a population of agents and engaging them in exploration and exploitation phases. The exploratory phase helps to explore the search space extensively, whereas the exploitatory step refines promising solutions from the exploratory stage.  Though effective, WOA may suffer from the low exploration of the search space. An enhanced WOA (WOAmM), proposed recently by @chakrabortyNovelEnhancedWhale2021, adds the mutualism phase of Symbiotic Organisms Search (SOS)  to WOA to improve the exploration.
 
 Optimization problems are essential in engineering and science research, and parallelization of the same is of practical use.
 
 ## Enhanced Whale Optimization Algorithm(WOAmM)
+
+A brief overview of the WOAmM and its component optimization algorithms follows. The focus is on the mathematical equations required for the computations. Refer to Algorithm 1 for the pseudo-code.
 
 ### Whale Optimization Algorithm
 
@@ -85,7 +93,7 @@ during the iteration process, and $rnd$ is an arbitrary number in the range
 During the search process, switching between the exploration and
 exploitation process is chosen depending on the value of $|A|$. If $A| \geq 1$,
 the exploration process comes into existence, enabling global search
-by using Eq. 1 and 2. When $|A| < 1$, then updating the positions of individuals is performed by using eq. 6 or 8. Depending on a probability
+using Eq. 1 and 2. When $|A| < 1$, then updating the positions of individuals is performed by using eq. 6 or 8. Depending on a probability
 value $\beta$, which is 0.5 for each strategy WOA process switches between
 encircling prey or bubble-net attacking strategy.
 
@@ -129,7 +137,6 @@ encircling prey or bubble-net attacking strategy.
 \end{algorithm}
 
 #### Modified Mutualism phase of symbiotic organism search (SOS) algorithm
-
 
 In this phase for every individual $(P_i)$, two random in­dividuals 
 $(P_m \And P_n)$ are selected from the population where $i \neq m \neq n$.
@@ -181,19 +188,23 @@ interaction among individuals from the population.
 
 ## Strategy
 
-From the pseudo-code available under algorithm1, we can identify regions amenable for parallelization. The outer while loop has to be sequential, and hence there is no scope for parallel execution. Our next bet would be the two inner `for` loops corresponding to the modified mutualism phase of SOS and WOA, respectively. However, there is one caveat if we choose to parallelize these regions. Both component optimization algorithms update the individuals with a random individual selected from the population. The probability that a randomly selected individual has already been updated increases from 0 for the first individual to 1 for the last individual in serial execution. If we parallelize the algorithm overlooking this issue, we will end up reducing the stochasticity of exploration. We will revisit the problem in the end.
+From the pseudo-code available under Algorithm 1, we can identify regions amenable for parallelization. The outer while loop
+ has to be sequential, and hence there is no scope for parallel execution. Our next bet would be the two inner `for` loops
+ corresponding to the modified mutualism phase of SOS and WOA, respectively. However, there is one caveat if we choose to
+ parallelize these regions. Both component optimization algorithms update the individuals with a random individual selected
+ from the population. The probability that a randomly selected individual has already been updated increases from 0 for the
+ first individual to 1 for the last individual in serial execution. If we parallelize the algorithm overlooking this issue,
+ we will end up reducing the stochasticity of exploration. We will revisit the problem in the end.
 
-### Single Block Approach
+### The plan for a single block
 
-A single block will execute the whole algorithm with threads equal to the population size.
+A single block will execute the whole algorithm with threads equal to the population size. A pseudo-code is available under Algorithm 2.
 
 1. Each thread will execute commands 1 to 4 in parallel. (Will store the population values in a shared array.
-2. Inside the while loop, all threads synchronize
-3. Each thread copies the shared array locally.  ( A modulo-based for loop is used to avoid bank conflicts.)
-4. Then, each thread executes the local population array's optimization codes except that there would be a sync event before WOA.
-5. Finally, write the local array to a shared array, with the minimum value for each individual.
-6. Loop.
-7. After the while loop ends, the device will return the best solution to the host.
+2. Inside the while loop, all threads synchronize the shared array locally.  ( A modulo-based for loop is used to avoid bank conflicts. Another option is the Cuda shuffle all reduction for minimum)
+3. Then, each thread executes the local population array's optimization codes except that there would be a sync event before WOA.
+4. Loop.
+5. After the while loop ends, the device will return the best solution to the host.
 
 \begin{algorithm}[H]
 \SetAlgoLined
@@ -232,9 +243,9 @@ A single block will execute the whole algorithm with threads equal to the popula
  \caption{Pseudo-code of the GPU WOAmM algorithm.}
 \end{algorithm}
 
-Random numbers are a bit troublesome. We will use the cuda library for random number and use separate seed for each block.
+Random numbers are a bit troublesome. We will use the Cuda library for random numbers and use a global seed with offsets for each thread.
 
-When random individuals are required we will resort to picking random element from an array of indices with elemination to avoid repeatation.
+When random individuals are required, we will generate a random number equal to the index size of the subpopulation to  be sampled with corrections.
 
 ### Optimizations
 
@@ -250,8 +261,9 @@ When random individuals are required we will resort to picking random element fr
 
 Few strategies to improve the stochasticity of the population, and thereby, the exploration phase follows.
 
-1. Loop through each component OA after syncing the local array to the shared array. Two iterations could probably give us results similar to the sequential algorithm.
-2. Run multiple blocks and take the best solution (an even better option would be to add this as an extra warp in the original kernel).
+1. Loop through each component OA within the while loop. Two iterations could probably give us results similar to the sequential algorithm.
+2. Run multiple blocks and take the best solution over from them.
 
 I prefer the second option to the first.
 
+## References
