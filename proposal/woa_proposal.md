@@ -1,6 +1,7 @@
 ---
 title: Parallel Enhanced Whale Optimization Algorithm
-author: Bevan Stanely
+author: Bevan Stanely 17285
+date: 30 April 2021
 autoEqnLabels: true
 bibliography: ref.bib
 link-citations: true
@@ -18,7 +19,7 @@ To develop a parallel GPU implementation of the recently proposed Enhanced Whale
 
 ## Background
 
-The Whale Optimization Algorithm (WOA) is a meta-heuristic optimization algorithm developed by @mirjaliliWhaleOptimizationAlgorithm2016. It uses the humpback whales' hunting mechanism. Like most optimization algorithms, it works by spawning a population of agents and engaging them in exploration and exploitation phases. The exploratory phase helps to explore the search space extensively, whereas the exploitatory step refines promising solutions from the exploratory stage.  Though effective, WOA may suffer from the low exploration of the search space. An enhanced WOA (WOAmM), proposed recently by @chakrabortyNovelEnhancedWhale2021, adds the mutualism phase of Symbiotic Organisms Search (SOS)  to WOA to improve the exploration.
+The Whale Optimization Algorithm (WOA) is a meta-heuristic optimization algorithm developed by @mirjaliliWhaleOptimizationAlgorithm2016. It uses the humpback whales' hunting mechanism. Like most optimization algorithms, it works by spawning a population of agents and engaging them in exploration and exploitation phases. The exploratory phase helps to explore the search space extensively, whereas the exploitatory step refines promising solutions from the exploratory stage.  Though effective, WOA may suffer from the low exploration of the search space. An enhanced WOA (WOAmM), proposed recently by @chakrabortyNovelEnhancedWhale2021, adds a modified mutualism phase of Symbiotic Organisms Search (SOS) to WOA to improve the exploration.
 
 Optimization problems are essential in engineering and science research, and parallelization of the same is of practical use.
 
@@ -75,7 +76,7 @@ D^*= P^{(k)}_{best}-P^{(k)}
 $$
 
 $$
-P^{(k+1)}= D^\cdot e^{bl} \cdot \cos{2\pi l} + P^{(k)}_{best}
+P^{(k+1)}= D^*\cdot e^{bl} \cdot \cos{2\pi l} + P^{(k)}_{best}
 $$
 
 where $b$ is used to defining the shape of the logarithmic spiral, and the
@@ -213,8 +214,8 @@ A single block will execute the whole algorithm with threads equal to the popula
  Calculate the fitness value of each \textit{search-agent}.\;
  Find the best \textit{search-agent} $P_{best}$\;
  Initialize $k = 0 \And \max_{iter}$\;
+ Copy the $P_i$ shared array to a local array\;
  \While{$k \leq \max_{iter}$}{
-    Copy the $P_i$ shared array to a local array\;
     \For{thread}{
         Select two other \textit{search-agent} $(P_m \And P_n)$ randomly where $P_i \neq P_m \neq P_n$\;
         Initialize array of indexes ind = $[P_m,P_n]$\;
@@ -223,6 +224,7 @@ A single block will execute the whole algorithm with threads equal to the popula
         Calculate the fitness of $P_i^{k+1}$ and $P_m^{k+1}$ or $P_n^{k+1}$\;
         Update the value of $P_i$ and $P_n$ or $P_m$ if the new fitness value is minimum (for minimization problem).\;
     }
+    \# Maybe avoiding the following sync can improve stochasticity\;
     Syncronize local array with shared array use min value of $P_i$ or the shuffle cuda operation could be faster\;
     Calculate $P_{best}$\;
     \#Procedure WOA starts from here\;
@@ -237,6 +239,7 @@ A single block will execute the whole algorithm with threads equal to the popula
         }
         Check boundary conditions\;
     }
+    Syncronize local array with shared array use min value of $P_i$ or the shuffle cuda operation could be faster\;
     $k=k+1$
  }
  Return $P_{best}$
@@ -251,7 +254,7 @@ When random individuals are required, we will generate a random number equal to 
 
 1. Use floats for fitness calculation.
 2. The population size can be set to equal the warp size 32.
-3. The local copy of the population array is a trick to avoid bank conflicts, which could be feasible since the population size is small. The modulo operation will not slow the execution since we use a constant value for population size.
+3. The local copy of the population array is a trick to avoid bank conflicts, which could be feasible since the population size is small. The modulo operation will not slow the execution since we use a constant value for population size. (The butterfly reduction with __shfl_xor_sync() could be even faster since it works between registers.)
 4. Within the device code, avoid pointer aliasing.
 5. We can reduce the if1 and if3 predicate to a min operation to avoid warp divergence.
 6. Use implicit synchronization within warp instead of the sync operation.
