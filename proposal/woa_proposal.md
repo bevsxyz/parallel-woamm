@@ -2,6 +2,7 @@
 title: Parallel Enhanced Whale Optimization Algorithm
 author: Bevan Stanely 17285
 date: 30 April 2021
+classoption: twocolumn
 autoEqnLabels: true
 bibliography: ref.bib
 link-citations: true
@@ -98,7 +99,7 @@ using Eq. 1 and 2. When $|A| < 1$, then updating the positions of individuals is
 value $\beta$, which is 0.5 for each strategy WOA process switches between
 encircling prey or bubble-net attacking strategy.
 
-\begin{algorithm}[H]
+\begin{algorithm}
 \SetAlgoLined
  Initialize the population $P_i(i = 1,2\ldots n)$\;
  Calculate the fitness value of each \textit{search-agent}.\;
@@ -207,7 +208,7 @@ A single block will execute the whole algorithm with threads equal to the popula
 4. Loop.
 5. After the while loop ends, the device will return the best solution to the host.
 
-\begin{algorithm}[H]
+\begin{algorithm}
 \SetAlgoLined
  \# Start kernel from here for single warp\;
  Initialize the population $P_i(i = 1,2\ldots n)$ in shared memory array\;
