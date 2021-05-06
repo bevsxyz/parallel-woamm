@@ -9,13 +9,20 @@
 
 #include <random>
 
+/// An object class for RNG
 class randomUniform{
     public:
+        /// @param lower_bound Lower Bound for Real Distribution
+        /// @param upper_bound Upper Bound for Real Distribution
         explicit randomUniform(int lower_bound, int upper_bound) 
         : gen(rd()),uniform_real(lower_bound, upper_bound){}
+
+        /// Reset Seed 
         void set_seed(){
             gen.seed(rd());
         }
+        /// @param lower_bound Lower Bound for Integer Distribution
+        /// @param upper_bound Upper Bound for Integer Distribution
         int integer(int lower_bound, int upper_bound){
             uniform_integer.param(std::uniform_int_distribution<int>::param_type(lower_bound, upper_bound));
             return uniform_integer(gen);
