@@ -12,10 +12,8 @@
 /// An object class for RNG
 class randomUniform{
     public:
-        /// @param lower_bound Lower Bound for Real Distribution
-        /// @param upper_bound Upper Bound for Real Distribution
-        explicit randomUniform(int lower_bound, int upper_bound) 
-        : gen(rd()),uniform_real(lower_bound, upper_bound){}
+        explicit randomUniform() 
+        : gen(rd()),uniform_real(0, 1){}
 
         /// Reset Seed 
         void set_seed(){
