@@ -9,6 +9,7 @@
 
 #include <stdio.h>
 #include <vector>
+#include "../../lib/mt64.h"
 
 using namespace std;
 

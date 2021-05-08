@@ -10,12 +10,13 @@
 
 #include "../population/population.h"
 #include "../data/data_stats.h"
+#include "../../lib/mt64.h"
 
 using namespace std;
 
 class WOAM{
 public:
-    WOAM(float (*f)(vector<float> &), float l, float u);
+    WOAM(float (*f)(vector<float> &), float l, float u, randomUniform *rnd_global);
     vector<float> run();
 
 private:

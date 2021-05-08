@@ -10,10 +10,11 @@
 #include <vector>
 #include "./data/data_stats.h"
 #include "./whale/woam.h"
+#include "../lib/mt64.h"
 
 using namespace std;
 
-DataStats runFunc(int experiment, string func_name, float (*f)(vector<float> &), float l, float u);
+DataStats runFunc(int experiment, string func_name, float (*f)(vector<float> &), float l, float u, randomUniform *rnd_global);
 
 void output_func(string func_name, DataStats result, vector<vector<float>> f_bests_history);
 

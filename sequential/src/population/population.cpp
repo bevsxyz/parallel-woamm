@@ -6,6 +6,8 @@
 #include "../../lib/mt64.h"
 #include "population.h"
 
+#define INT_MAX 2147483647
+
 /// Initialize a population
 /// @param s population size
 /// @param d population dimension

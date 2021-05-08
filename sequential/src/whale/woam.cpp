@@ -5,12 +5,12 @@
 #include <cmath>
 
 using namespace std;
-WOAM::WOAM(float (*f)(vector<float> &), float l, float u){
+WOAM::WOAM(float (*f)(vector<float> &), float l, float u,  randomUniform *rnd_global){
     function = f;
     bound_low = l;
     bound_high = u;
     population.init(psize, dimension, f, l, u);
-    rnd = new randomUniform();
+    rnd = rnd_global;
 }
 
 /// Calculate the fitness for all individuals
@@ -32,8 +32,8 @@ void WOAM::msos_update_pop(int i, int x, int y){
     int bf1,bf2;
     float mv,temp,cost_i,cost_y;
     vector<float> p_i, p_y;
-    bf1 = 1 + rnd->integer()%2 ;
-    bf2 = 1 + rnd->integer()%2 ;
+    bf1 = 1 + rnd->real()*2 ;
+    bf2 = 1 + rnd->real()*2 ;
     for (int j = 0; j < dimension; j++){
         mv = (population.data[i][j]+population.data[y][j])/2;
         temp = population.data[i][j] + (rnd->real()* (population.data[x][j]-mv*bf1));
