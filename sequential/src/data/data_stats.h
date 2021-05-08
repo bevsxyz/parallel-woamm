@@ -2,6 +2,7 @@
 #define data_stats_h
 
 #include <vector>
+#include <string>
 
 using namespace std;
 
@@ -13,6 +14,7 @@ public:
     float stand;
     float range[2];
     float time_avg;
+    string func_name;
     vector<float> time;
     vector<float> data;
 

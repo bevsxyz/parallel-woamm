@@ -21,6 +21,7 @@ using namespace std;
 /// @return return result analysis
 DataStats runFunc(int experiment, string func_name, float (*f)(vector<float> &), float l, float u,  randomUniform *rnd_global){
     DataStats result;
+    result.func_name = func_name;
     vector<vector<float>> f_bests_history;
     float time_temp = 0;
 
@@ -86,9 +87,10 @@ void output_func(string func_name, DataStats result, vector<vector<float>> f_bes
 /// @param result_best best result for each function
 void output_all(vector<DataStats> result_bests){
     ofstream file("./out/woam_best_stats.csv");
-    file << "Function,Mean,Median,Std,Range(low),Range(high),Time(ms)" << endl;
+    file << "Function,Name,Mean,Median,Std,Range(low),Range(high),Time(ms)" << endl;
     for (int i = 0; i < result_bests.size(); i++){
         file << i + 1 << ",";
+        file << result_bests[i].func_name << ",";
         file << result_bests[i].mean << "," ;
         file << result_bests[i].median << ",";
         file << result_bests[i].stand << "," ;

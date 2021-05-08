@@ -17,13 +17,13 @@ float func::sphere(vector<float> &x){
 /// Function 2, Implementation of Rosenbrock's function
 /// @param x descriptionx Vector of float
 float func::rosenbrock(vector<float> &x){
-    double result = 0;
+    float result = 0;
     for (int i = 0; i < x.size() - 1; i++){
-        double a = x[i] * x[i] - x[i+1];
-        double b = 1.0 - x[i];
+        float a = x[i] * x[i] - x[i+1];
+        float b = 1.0 - x[i];
         result += 100 * a * a + b * b;
     }
-    return (float)result;
+    return result;
 }
 
 /// Function 3, Implementation of Rastrigin's function
