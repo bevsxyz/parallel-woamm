@@ -27,10 +27,12 @@ OA::OA(__device__ float (*f)(const float __restrict__ &), float l, float u){
                 mtgp32dc_params_fast_11213, devKernelParams, psize, time(NULL));
 }
 
+/// The main function for WOAM
 __global__ void OA::woam(){
-    curandStateMtgp32 localState = devMTGPStates[threadIdx.x]
+    int myID = threadIdx.x;
+    curandStateMtgp32 localState = devMTGPStates[myID];
     float myData[dimension],cost,costBest;
-    int indexBest=threadIdx.x;
+    int indexBest=myID;
 
     for (int j = 0; j < dimension; j++){
         /// generate data
@@ -45,11 +47,15 @@ __global__ void OA::woam(){
         // mMSOS Component
         msos(&myData,&cost,&localState);
 
+        costBest = cost;
+        indexBest=myID;
         getBest(&indexBest,&costBest);
 
         // WOA Component
         woa(&myData,&cost,k,&localState);
 
+        costBest = cost;
+        indexBest=myID;
         getBest(&indexBest,&costBest);
     }
 
@@ -59,7 +65,7 @@ __global__ void OA::woam(){
 /// Uses a butterfly reduction
 /// @param indexBest Index of the individual with minimum cost, will be updated
 /// @param costBest Cost of the individual with minimum cost, will be updated
-__device__ void getBest(int * __restrict__ indexBest,float * __restrict__ costBest){
+__device__ void OA::getBest(int * __restrict__ indexBest,float * __restrict__ costBest){
     float costTemp;
     int indexTemp;
     for (int i=16; i>=1; i/=2){
@@ -86,7 +92,12 @@ __device__ void OA::getData(const int index,const float * __restrict__ myData,co
     }
 }
 
-__device__ void updatePop(const int * __restrict__ random_particles,float * __restrict__ my_Data,
+/// Update the population for msos
+/// @param random_particles Array of the two random individuals picked
+/// @param myData Pointer for my data
+/// @param myCost Pointer for my cost
+/// @param localState MTGP32 PRG state
+__device__ void OA::updatePop(const int * __restrict__ random_particles,float * __restrict__ my_Data,
     float * __restrict__ my_cost, curandStateMtgp32 *localState){
     
     float cost_rp[2],data_rp[2*dimension];
@@ -124,12 +135,14 @@ __device__ void updatePop(const int * __restrict__ random_particles,float * __re
     my_cost_kp1 = function(my_Data_kp1);
     cost_rp_kp1 = function(data_rp_kp1);
 
-    /// If the new cost in the minima update my individual data
+    /// If the new cost is the minima update my individual data
     if(my_cost_kp1 < my_cost){
         my_cost = my_cost_kp1;
         for(int i = 0; i < dimension; i++)
             my_Data[i] = my_Data_kp1[i];
     }
+
+    /// Need to implement the update of random indivdual
 
 }
 
@@ -153,7 +166,7 @@ __device__ void OA::msos(float * __restrict__ myData,float * __restrict__ cost,c
 }
 
 
-__device__ void OA::woa(float * __restrict__ myData,float * __restrict__ cost,int k,curandStateMtgp32 *localState){
+__device__ void OA::woa(float * __restrict__ myData,float * __restrict__ cost,curandStateMtgp32 *localState,int k){
 
 }
 

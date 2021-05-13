@@ -48,8 +48,13 @@ class OA{
         __device__ void getData(const int index,const float * __restrict__ myData,
         const float * __restrict__ myCost,float * __restrict__ data,float * __restrict__ cost);
         __device__ void getBest(int * __restrict__ indexBest,float * __restrict__ costBest);
-        __device__ void msos(float * __restrict__ myData,float * __restrict__ cost,curandStateMtgp32 *localState,
-        int * __restrict__ indexBest,float * __restrict__ costBest);
+
+        __device__ void updatePop(const int * __restrict__ random_particles,float * __restrict__ my_Data,
+        float * __restrict__ my_cost, curandStateMtgp32 *localState);
+
+        __device__ void msos(float * __restrict__ myData,float * __restrict__ cost,curandStateMtgp32 *localState);
+        __device__ void woa(float * __restrict__ myData,float * __restrict__ cost,curandStateMtgp32 *localState, int k);
+
         __global__ void woam();
 
 };
