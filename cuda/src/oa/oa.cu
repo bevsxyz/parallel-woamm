@@ -52,12 +52,13 @@ __global__ void OA::woam(){
         getBest(&indexBest,&costBest);
 
         // WOA Component
-        woa(&myData,&cost,k,&localState,&indexBest,&costBest);
+        woa(&myData,&cost,k,&localState,&indexBest);
 
         costBest = cost;
         indexBest=myID;
         getBest(&indexBest,&costBest);
     }
+    *device_solution = costBest;
 
 }
 
@@ -262,8 +263,9 @@ __device__ void OA::woa(float * __restrict__ myData,float * __restrict__ cost,cu
 vector<float> OA::run(){
     vector<float> global_best_solution;
 
-    woam<<1,psize>>(bound_low,bound_high,time(NULL));
+    woam<<1,psize>>();
 
-    global_best_solution.pushback(*best_solution);
+    cudaMemcpy(&host_solution, device_solution, (sizeof(float)), cudaMemcpyDeviceToHost);
+    global_best_solution.pushback(host_solution);
     return global_best_solution;
 }

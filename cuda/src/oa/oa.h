@@ -53,7 +53,8 @@ class OA{
         float * __restrict__ my_cost, curandStateMtgp32 *localState);
 
         __device__ void msos(float * __restrict__ myData,float * __restrict__ cost,curandStateMtgp32 *localState);
-        __device__ void woa(float * __restrict__ myData,float * __restrict__ cost,curandStateMtgp32 *localState, int k);
+        __device__ void woa(float * __restrict__ myData,float * __restrict__ cost,curandStateMtgp32 *localState,
+        int current_iter,int * __restrict__ indexBest);
 
         __global__ void woam();
 
