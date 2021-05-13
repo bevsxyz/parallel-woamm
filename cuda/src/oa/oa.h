@@ -45,6 +45,8 @@ class OA{
         /// Functions
 
         __device__ float (*function) (const float __restrict__ &);
+        __device__ void getData(const int index,const float * __restrict__ myData,
+        const float * __restrict__ myCost,float * __restrict__ data,float * __restrict__ cost);
         __device__ void getBest(int * __restrict__ indexBest,float * __restrict__ costBest);
         __device__ void msos(float * __restrict__ myData,float * __restrict__ cost,curandStateMtgp32 *localState,
         int * __restrict__ indexBest,float * __restrict__ costBest);

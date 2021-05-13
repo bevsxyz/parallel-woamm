@@ -68,6 +68,20 @@ __device__ void getBest(int * __restrict__ indexBest,float * __restrict__ costBe
     }
 }
 
+/// Get data from individual "index"
+/// @param index Index of the individual to copy data from
+/// @param myData Pointer for my data
+/// @param myCost Pointer for my cost
+/// @param data Pointer to the float array to which we will copy the other individual's data
+/// @param cost Pointer to the float to which we will copy the other individual's cost
+__device__ void OA::getData(const int index,const float * __restrict__ myData,const float * __restrict__ myCost,
+    float * __restrict__ data,float * __restrict__ cost){
+    *cost = __shfl_sync(0xffffffff, myCost,index);
+    for (int i = 0; i < dimension; i++){
+        data[i] = __shfl_sync(0xffffffff, myData[i],index);
+    }
+}
+
 /// Component Optimization Algorithm: Modified Mutualism Phase of SOS
 /// @param myData Vector array of data of individual
 /// @param cost Cost of myData for the given function
@@ -77,7 +91,7 @@ __device__ void getBest(int * __restrict__ indexBest,float * __restrict__ costBe
 __device__ void OA::msos(float * __restrict__ myData,float * __restrict__ cost,curandStateMtgp32 *localState,
     int * __restrict__ indexBest,float * __restrict__ costBest){
     int random_particles,pick,m,n;
-    float cost_rp[2];
+    float cost_rp[2],rp0Data[dimension],rp1Data[dimension];
     for (int i = 0; i < psize; i++){
         random_particles[0] = int(curand_uniform(localState) * (psize-1))-1;
         if(random_particles[0] >= i)
@@ -88,8 +102,9 @@ __device__ void OA::msos(float * __restrict__ myData,float * __restrict__ cost,c
         if(random_particles[1] >= random_particles[0])
             random_particles[1]++;
         
-        cost_rp[0] = __shfl_sync(0xffffffff, cost,random_particles[0]);
-        cost_rp[1] = __shfl_sync(0xffffffff, cost,random_particles[1]);
+        getData(random_particles[0],my_Data,my_cost,rp0Data,&cost_rp[0]);
+        getData(random_particles[1],my_Data,my_cost,rp1Data,&cost_rp[1]);
+
         pick = cost_rp[0] < cost_rp[1];
     }
 }
