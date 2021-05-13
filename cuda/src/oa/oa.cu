@@ -115,8 +115,8 @@ __device__ void OA::updatePop(const int * __restrict__ random_particles,float * 
     hIndex = highFitness * dimension;
     lIndex = lowFitness * dimension;
 
-    float my_Data_kp1[dimension],data_rp_kp1[dimension]
-    float my_cost_kp1,cost_rp_kp1;
+    float my_Data_kp1[dimension];
+    float my_cost_kp1;
     
     int bf1,bf2,x,y,z;
     float mv;
@@ -128,12 +128,12 @@ __device__ void OA::updatePop(const int * __restrict__ random_particles,float * 
     for (x = 0,y=lIndex,z=hIndex; x < dimension; x++,y++,z++){
         mv = (my_Data[x] + data_rp[z])/2;
         my_Data_kp1[x] = my_Data[x] + (curand_uniform(localState) * (data_rp[y] - mv*bf1));
-        data_rp_kp1[x] = data_rp[z]  + (curand_uniform(localState) * (data_rp[y] - mv*bf2));
+        data_rp[x] = data_rp[z]  + (curand_uniform(localState) * (data_rp[y] - mv*bf2));
     }
 
     /// Calculate the costs
     my_cost_kp1 = function(my_Data_kp1);
-    cost_rp_kp1 = function(data_rp_kp1);
+    cost_rp[0] = function(data_rp);
 
     /// If the new cost is the minima update my individual data
     if(my_cost_kp1 < my_cost){
@@ -143,6 +143,23 @@ __device__ void OA::updatePop(const int * __restrict__ random_particles,float * 
     }
 
     /// Need to implement the update of random indivdual
+    int myID = threadIdx.x;
+    int index=myID,indexTemp, rindex=random_particles[highFitness];
+    float costTemp;
+    for(int i = 0; i < 32; i++){
+        costTemp = __shfl_sync(0xffffffff, cost_rp[0],i);
+        indexTemp = __shfl_sync(0xffffffff, rindex,i);
+        if(indexTemp == myID){
+            if(my_cost<costTemp){
+                index = i;
+                my_cost = costTemp;
+            }
+        }
+    }
+
+    for (int i = 0; i < dimension; i++){
+        my_Data[i] = __shfl_sync(0xffffffff, data_rp[i],index);
+    }
 
 }
 
@@ -151,7 +168,7 @@ __device__ void OA::updatePop(const int * __restrict__ random_particles,float * 
 /// @param cost Cost of myData for the given function
 /// @param localState MTGP32 PRG state
 __device__ void OA::msos(float * __restrict__ myData,float * __restrict__ cost,curandStateMtgp32 *localState){
-    int random_particles;
+    int random_particles[2];
     int my_index = threadIdx.x;
     random_particles[0] = int(curand_uniform(localState) * (psize-1))-1;
     if(random_particles[0] >= my_index)
