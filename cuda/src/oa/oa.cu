@@ -43,10 +43,14 @@ __global__ void OA::woam(){
 
     for (int k = 0; k < max_iter; k++){
         // mMSOS Component
-        msos(&myData,&cost,&localState,&indexBest,&costBest);
+        msos(&myData,&cost,&localState);
+
+        getBest(&indexBest,&costBest);
 
         // WOA Component
-        woa(&myData,&cost,k,&localState,&indexBest,&costBest);
+        woa(&myData,&cost,k,&localState);
+
+        getBest(&indexBest,&costBest);
     }
 
 }
@@ -82,35 +86,74 @@ __device__ void OA::getData(const int index,const float * __restrict__ myData,co
     }
 }
 
+__device__ void updatePop(const int * __restrict__ random_particles,float * __restrict__ my_Data,
+    float * __restrict__ my_cost, curandStateMtgp32 *localState){
+    
+    float cost_rp[2],data_rp[2*dimension];
+
+    getData(random_particles[0],my_Data,my_cost,data_rp,&cost_rp[0]);
+    getData(random_particles[1],my_Data,my_cost,&data_rp[dimension],&cost_rp[1]);
+
+    /// Calculate Fitness
+    int highFitness, lowFitness, hIndex , lIndex;
+
+    highFitness = cost_rp[0] < cost_rp[1];
+    lowFitness = !highFitness;
+
+    /// Also the corresponding starting indices of the high and low fitness individuals
+    hIndex = highFitness * dimension;
+    lIndex = lowFitness * dimension;
+
+    float my_Data_kp1[dimension],data_rp_kp1[dimension]
+    float my_cost_kp1,cost_rp_kp1;
+    
+    int bf1,bf2,x,y,z;
+    float mv;
+
+    bf1 = 1 + curand_uniform(localState) * 2;
+    bf2 = 1 + curand_uniform(localState) * 2;
+
+    /// Calculate the k+1 population values
+    for (x = 0,y=lIndex,z=hIndex; x < dimension; x++,y++,z++){
+        mv = (my_Data[x] + data_rp[z])/2;
+        my_Data_kp1[x] = my_Data[x] + (curand_uniform(localState) * (data_rp[y] - mv*bf1));
+        data_rp_kp1[x] = data_rp[z]  + (curand_uniform(localState) * (data_rp[y] - mv*bf2));
+    }
+
+    /// Calculate the costs
+    my_cost_kp1 = function(my_Data_kp1);
+    cost_rp_kp1 = function(data_rp_kp1);
+
+    /// If the new cost in the minima update my individual data
+    if(my_cost_kp1 < my_cost){
+        my_cost = my_cost_kp1;
+        for(int i = 0; i < dimension; i++)
+            my_Data[i] = my_Data_kp1[i];
+    }
+
+}
+
 /// Component Optimization Algorithm: Modified Mutualism Phase of SOS
 /// @param myData Vector array of data of individual
 /// @param cost Cost of myData for the given function
 /// @param localState MTGP32 PRG state
-/// @param indexBest Index of the individual with minimum cost
-/// @param costBest Cost of the individual with minimum cost
-__device__ void OA::msos(float * __restrict__ myData,float * __restrict__ cost,curandStateMtgp32 *localState,
-    int * __restrict__ indexBest,float * __restrict__ costBest){
-    int random_particles,pick,m,n;
-    float cost_rp[2],rp0Data[dimension],rp1Data[dimension];
-    for (int i = 0; i < psize; i++){
-        random_particles[0] = int(curand_uniform(localState) * (psize-1))-1;
-        if(random_particles[0] >= i)
-            random_particles[0]++;
-        random_particles[1] = int(curand_uniform(localState) * (psize-2))-1;
-        if(random_particles[1] >= i)
-            random_particles[1]++;
-        if(random_particles[1] >= random_particles[0])
-            random_particles[1]++;
-        
-        getData(random_particles[0],my_Data,my_cost,rp0Data,&cost_rp[0]);
-        getData(random_particles[1],my_Data,my_cost,rp1Data,&cost_rp[1]);
-
-        pick = cost_rp[0] < cost_rp[1];
-    }
+__device__ void OA::msos(float * __restrict__ myData,float * __restrict__ cost,curandStateMtgp32 *localState){
+    int random_particles;
+    int my_index = threadIdx.x;
+    random_particles[0] = int(curand_uniform(localState) * (psize-1))-1;
+    if(random_particles[0] >= my_index)
+        random_particles[0]++;
+    random_particles[1] = int(curand_uniform(localState) * (psize-2))-1;
+    if(random_particles[1] >= my_index)
+        random_particles[1]++;
+    if(random_particles[1] >= random_particles[0])
+        random_particles[1]++;
+    
+    updatePop(&random_particles,myData,cost,localState);
 }
 
 
-__device__ void OA::woa(float * __restrict__ cost,int k,curandStateMtgp32 *localState){
+__device__ void OA::woa(float * __restrict__ myData,float * __restrict__ cost,int k,curandStateMtgp32 *localState){
 
 }
 
