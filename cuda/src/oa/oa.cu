@@ -56,12 +56,14 @@ __global__ void OA::woam(){
 /// @param indexBest Index of the individual with minimum cost, will be updated
 /// @param costBest Cost of the individual with minimum cost, will be updated
 __device__ void getBest(int * __restrict__ indexBest,float * __restrict__ costBest){
-    float temp;
+    float costTemp;
+    int indexTemp;
     for (int i=16; i>=1; i/=2){
-        temp = __shfl_xor_sync(0xffffffff, costBest, i, 32);
-        if(temp<costBest){
-            costBest=temp;
-            indexBest = i;
+        costTemp = __shfl_xor_sync(0xffffffff, costBest, i, 32);
+        indexTemp = __shfl_xor_sync(0xffffffff, indexBest, i,32);
+        if(costTemp<costBest){
+            costBest=costTemp;
+            indexBest = indexTemp;
         }
     }
 }

@@ -11,10 +11,10 @@
 #include <curand.h>
 #include <curand_kernel.h>
 #include <thrust/device_vector.h>
- /* include MTGP host helper functions */
- #include <curand_mtgp32_host.h>
- /* include MTGP pre-computed parameter sets */
- #include <curand_mtgp32dc_p_11213.h>
+/// include MTGP host helper functions
+#include <curand_mtgp32_host.h>
+/// include MTGP pre-computed parameter sets
+#include <curand_mtgp32dc_p_11213.h>
 
 using namespace std;
 
@@ -47,7 +47,7 @@ class OA{
         __device__ float (*function) (const float __restrict__ &);
         __device__ void getBest(int * __restrict__ indexBest,float * __restrict__ costBest);
         __device__ void msos(float * __restrict__ myData,float * __restrict__ cost,curandStateMtgp32 *localState,
-    int * __restrict__ indexBest,float * __restrict__ costBest);
+        int * __restrict__ indexBest,float * __restrict__ costBest);
         __global__ void woam();
 
 };
