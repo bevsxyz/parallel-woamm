@@ -1,4 +1,5 @@
 #include "oa.h"
+#include <iostream>
 
 /// @param f Function to be evaluvated
 /// @param l lower bound of the function
@@ -8,7 +9,7 @@ vector<float> run(int f, float l, float u){
     curandStateMtgp32 *devMTGPStates;      /// State array for MTGP32 generator
     mtgp32_kernel_params *devKernelParams; /// Parameters for initialising PRG
 
-    float *host_solution,*device_solution;
+    float host_solution,*device_solution;
     cudaMalloc((void**)&device_solution, sizeof(float));
 
     /// Allocate space for prng states on device
@@ -28,10 +29,12 @@ vector<float> run(int f, float l, float u){
     woam<<<1,32>>>(devMTGPStates,f,l,u, device_solution);
 
     cudaMemcpy(&host_solution, device_solution, (sizeof(float)), cudaMemcpyDeviceToHost);
-    global_best_solution.push_back(*host_solution);
+    
+    global_best_solution.push_back(host_solution);
     cudaFree(device_solution);
     cudaFree(devMTGPStates);
     cudaFree(devKernelParams);
+    
     return global_best_solution;
 }
 
@@ -212,6 +215,8 @@ __device__ void woa(int f,float * __restrict__ myData,float * __restrict__ myCos
     const int max_iter = 30;
     const int psize = 32;
     const int dimension = 30;
+    const float PI = 3.14159265358979323846;
+    const float E  = 2.71828182845904523536;
     
     /// Decreases linearly from 2 to 0
     const float a_1 = 2.0 * (max_iter  - current_iter)/ max_iter;
@@ -264,7 +269,7 @@ __device__ void woa(int f,float * __restrict__ myData,float * __restrict__ myCos
         d[1][0] = fabsf(c[1] * particles[0][j]-myData[j]);
 
         a[0] = -(2.0 * a_1 * r - a_1);
-        a[1] = powf(M_E,b * l) * cosf( 2.0 * M_PI * l);
+        a[1] = powf(E,b * l) * cosf( 2.0 * PI * l);
 
         /// p: 0 or 1
         p = beta >= 0.5;

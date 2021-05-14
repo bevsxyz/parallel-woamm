@@ -7,13 +7,13 @@
 #ifndef func_h
 #define func_h
 
-__device__ float sphere(const float * x);
-__device__ float rosenbrock(const float * x);
+__device__ float sphere(const float * __restrict__ x);
+__device__ float rosenbrock(const float * __restrict__ x);
 
 // Variable dimensions multimodal functions
 
-__device__ float rastrigin(const float * x);
-__device__ float griewangk(const float * x);
+__device__ float rastrigin(const float * __restrict__ x);
+__device__ float griewangk(const float * __restrict__ x);
 
 __device__ void func(int f, const float * __restrict__ mydata,float * __restrict__ cost);
 
