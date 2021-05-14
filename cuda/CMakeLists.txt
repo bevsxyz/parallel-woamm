@@ -7,7 +7,7 @@ include(CTest)
 find_package(CUDA REQUIRED)
 message(STATUS "Found CUDA ${CUDA_VERSION_STRING} at ${CUDA_TOOLKIT_ROOT_DIR}")
 
-set(CUDA_LINK_LIBRARIES_KEYWORD PUBLIC)
+include_directories(${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES}) 
 
 add_library(whale STATIC
         lib/mpgp32.cu
