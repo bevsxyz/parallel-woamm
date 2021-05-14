@@ -8,9 +8,9 @@
 #define oa
 
 #include <vector>
+ #include <cuda.h>
 #include <curand.h>
 #include <curand_kernel.h>
-#include <thrust/device_vector.h>
 /// include MTGP host helper functions
 #include <curand_mtgp32_host.h>
 /// include MTGP pre-computed parameter sets
@@ -20,7 +20,7 @@ using namespace std;
 
 class OA{
     public:
-        OA(__device__ float (*f)(const float __restrict__ &), float l, float u);
+        OA(float (*f)(const float * __restrict__ &), float l, float u);
         vector<float> run();        
 
     private:
@@ -44,7 +44,7 @@ class OA{
 
         /// Functions
 
-        __device__ float (*function) (const float __restrict__ &);
+        float (*function) (const float * __restrict__ &);
         __device__ void getData(const int index,const float * __restrict__ myData,
         const float * __restrict__ myCost,float * __restrict__ data,float * __restrict__ cost);
         __device__ void getBest(int * __restrict__ indexBest,float * __restrict__ costBest);
@@ -56,8 +56,8 @@ class OA{
         __device__ void woa(float * __restrict__ myData,float * __restrict__ cost,curandStateMtgp32 *localState,
         int current_iter,int * __restrict__ indexBest);
 
-        __global__ void woam();
-
+        __host__ __device__ void woam(curandStateMtgp32 *devMTGPStates, int dimension,int max_iter,
+        float bound_low,float bound_high,float (*function)(const float* __restrict__ &))
 };
 
 

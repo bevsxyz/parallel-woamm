@@ -1,3 +1,10 @@
+#include <curand.h>
+#include <curand_kernel.h>
+#include <thrust/device_vector.h>
+/// include MTGP host helper functions
+#include <curand_mtgp32_host.h>
+/// include MTGP pre-computed parameter sets
+#include <curand_mtgp32dc_p_11213.h>
 #include "oa.h"
 
 /// Initialise the host and device parameters
@@ -5,7 +12,7 @@
 /// @param f Function to be evaluvated
 /// @param l lower bound of the function
 /// @param u upper bound of the function
-OA::OA(__device__ float (*f)(const float __restrict__ &), float l, float u){
+OA::OA(float (*f)(const float* __restrict__ &), float l, float u){
     function = f;
     bound_low = l;
     bound_high = u;
@@ -28,15 +35,16 @@ OA::OA(__device__ float (*f)(const float __restrict__ &), float l, float u){
 }
 
 /// The main function for WOAM
-__global__ void OA::woam(){
+__host__ __device__ void woam(curandStateMtgp32 *devMTGPStates, int dimension, int max_iter, float bound_low,
+    float bound_high,float (*function)(const float* __restrict__ &)){
     int myID = threadIdx.x;
     curandStateMtgp32 localState = devMTGPStates[myID];
-    float myData[dimension],cost,costBest;
+    float myData[30],cost,costBest;
     int indexBest=myID;
 
     for (int j = 0; j < dimension; j++){
         /// generate data
-        myData[j] = (float)(bound_low + (curand_uniform(&localState)* (bound_high - bound_low));
+        myData[j] = (float)(bound_low + (curand_uniform(&localState)* (bound_high - bound_low)));
     }
     cost = function(myData);
     costBest = cost;
@@ -263,7 +271,7 @@ __device__ void OA::woa(float * __restrict__ myData,float * __restrict__ cost,cu
 vector<float> OA::run(){
     vector<float> global_best_solution;
 
-    woam<<1,psize>>();
+    woam(devMTGPStates,dimension,max_iter,bound_low,bound_high,function);
 
     cudaMemcpy(&host_solution, device_solution, (sizeof(float)), cudaMemcpyDeviceToHost);
     global_best_solution.pushback(host_solution);
