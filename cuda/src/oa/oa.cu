@@ -1,5 +1,4 @@
 #include "oa.h"
-#include <iostream>
 
 /// @param f Function to be evaluvated
 /// @param l lower bound of the function

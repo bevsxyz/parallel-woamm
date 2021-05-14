@@ -31,10 +31,10 @@ __device__ float sphere(const float * __restrict__ x){
 /// Function 2, Implementation of Rosenbrock's function
 /// @param x Array vector of float
 __device__ float rosenbrock(const float * __restrict__ x){
-    float result = 0;
+    float result = 0, a,b;
     for (int i = 0; i < fpsize - 1; i++){
-        double a = x[i] * x[i] - x[i+1];
-        double b = 1.0 - x[i];
+        a = x[i] * x[i] - x[i+1];
+        b = 1.0 - x[i];
         result += 100 * a * a + b * b;
     }
     return result;
@@ -45,7 +45,7 @@ __device__ float rosenbrock(const float * __restrict__ x){
 __device__ float rastrigin(const float * __restrict__ x){
     float result = 0;
     for (int i = 0; i < fpsize ; i++){
-        result += x[i] * x[i] - 10.0 * __cosf((2 * PI * x[i]));
+        result += x[i] * x[i] - 10.0 * __cosf(2 * PI * x[i]);
     }
     return 10 * fpsize + result;
 }
@@ -56,7 +56,7 @@ __device__ float griewangk(const float * __restrict__ x){
     float product = 1;
     for (int i = 0; i < fpsize ; i++){
         sum += x[i] * x[i] / 4000;
-        product *= __cosf(x[i]*sqrtf(i+1));
+        product *= __cosf(x[i]*rsqrtf(i+1));
     }
     return 1.0 + sum - product;
 }
