@@ -10,13 +10,13 @@
 namespace func {
     // Variable dimensions unimodal functions
 
-    __device__ float sphere(float * __restrict__ x);
-    __device__ float rosenbrock(float * __restrict__ x);
+    float sphere(float * x);
+    float rosenbrock(float * x);
 
     // Variable dimensions multimodal functions
 
-    __device__ float rastrigin(float * __restrict__ x);
-    __device__ float griewangk(float * __restrict__ x);
+    float rastrigin(float * x);
+    float griewangk(float * x);
 }
 
 #endif

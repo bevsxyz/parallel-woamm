@@ -8,7 +8,7 @@
 #define oa
 
 #include <vector>
-#include "../../lib/mpgp32.h"
+#include "../../lib/mpgp32.cu"
 
 using namespace std;
         

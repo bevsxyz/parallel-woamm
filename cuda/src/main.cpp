@@ -2,8 +2,10 @@
 #include <vector>
 
 #include "runner.h"
+
 #include "./func/func.h"
 #include "./data/data_stats.h"
+#include "../lib/mpgp32.cu"
 
 using namespace std;
 

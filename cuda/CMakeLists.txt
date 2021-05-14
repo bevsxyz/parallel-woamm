@@ -4,8 +4,10 @@ project(cmake_and_cuda LANGUAGES CXX CUDA)
 
 include(CTest)
 
-find_package(CUDA  REQUIRED)
-include_directories("${CUDA_INCLUDE_DIRS}")
+find_package(CUDA REQUIRED)
+message(STATUS "Found CUDA ${CUDA_VERSION_STRING} at ${CUDA_TOOLKIT_ROOT_DIR}")
+
+set(CUDA_LINK_LIBRARIES_KEYWORD PUBLIC)
 
 add_library(whale STATIC
         lib/mpgp32.cu
@@ -32,5 +34,5 @@ set_property(TARGET whale_test
              PROPERTY CUDA_SEPARABLE_COMPILATION ON)
 
 
-target_link_libraries(whale_test PRIVATE whale)
+target_link_libraries(whale_test whale)
 
