@@ -73,7 +73,7 @@ __global__ void woam(curandStateMtgp32 *devMTGPStates,int f,float l, float u, fl
         indexBest=myID;
         getBest(&indexBest,&costBest);
     }
-    *solution = costBest;
+    solution[0] = costBest;
 }
 
 /// Finds the best cost in the population
@@ -147,7 +147,7 @@ __device__ void updatePop(int f,const int * __restrict__ random_particles,float 
 
     /// Calculate the k+1 population values
     for (x = 0,y=lIndex,z=hIndex; x < dimension; x++,y++,z++){
-        mv = (my_Data[x] + data_rp[z])/2;
+        mv = __fdividef((my_Data[x] + data_rp[z]),2);
         my_Data_kp1[x] = my_Data[x] + (curand_uniform(localState) * (data_rp[y] - mv*bf1));
         data_rp[x] = data_rp[z]  + (curand_uniform(localState) * (data_rp[y] - mv*bf2));
     }
@@ -215,13 +215,12 @@ __device__ void woa(int f,float * __restrict__ myData,float * __restrict__ myCos
     const int psize = 32;
     const int dimension = 30;
     const float PI = 3.14159265358979323846;
-    const float E  = 2.71828182845904523536;
     
     /// Decreases linearly from 2 to 0
-    const float a_1 = 2.0 * (max_iter  - current_iter)/ max_iter;
+    const float a_1 = 2.0 * __fdividef((max_iter  - current_iter),max_iter);
 
     /// Decreases linearly from -1 to -2
-    const float a_2 = (-1.0 * (max_iter  - current_iter)/ max_iter) - 1.0;
+    const float a_2 = (-1.0 * __fdividef((max_iter  - current_iter), max_iter)) - 1.0;
 
     float l = (a_2 - 1)* curand_uniform(localState) + 1;
     
@@ -268,7 +267,7 @@ __device__ void woa(int f,float * __restrict__ myData,float * __restrict__ myCos
         d[1][0] = fabsf(c[1] * particles[0][j]-myData[j]);
 
         a[0] = -(2.0 * a_1 * r - a_1);
-        a[1] = powf(E,b * l) * cosf( 2.0 * PI * l);
+        a[1] = __expf(b * l) * __cosf( 2.0 * PI * l);
 
         /// p: 0 or 1
         p = beta >= 0.5;
