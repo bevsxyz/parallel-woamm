@@ -8,57 +8,25 @@
 #define oa
 
 #include <vector>
- #include <cuda.h>
-#include <curand.h>
-#include <curand_kernel.h>
-/// include MTGP host helper functions
-#include <curand_mtgp32_host.h>
-/// include MTGP pre-computed parameter sets
-#include <curand_mtgp32dc_p_11213.h>
+#include "../../lib/mpgp32.h"
 
 using namespace std;
-
-class OA{
-    public:
-        OA(float (*f)(const float * __restrict__ &), float l, float u);
-        vector<float> run();        
-
-    private:
-        /// Variables
-
-        int max_iter = 30;       /// Max iteration
-        float b = 0.8;
-        int psize = 32;          /// Size of population
-        int dimension = 30;      /// Dimension
-        float host_solution;     /// Host pointer for best cost
-        float * device_solution; /// Device pointer for best cost
-
-        float bound_low; /// Objective function solution lower bound
-        float bound_high; /// Objective function solution higher bound
-
-        curandStateMtgp32 *devMTGPStates;      /// State array for MTGP32 generator
-        mtgp32_kernel_params *devKernelParams; /// Parameters for initialising PRG
-
         
-        
+vector<float> run(float (*f)(float*), float l, float u);    
+__global__ void woam(curandStateMtgp32 *devMTGPStates,float (*f)(float*),float l, float u, float*solution);
 
-        /// Functions
+__device__ void getData(const int index,const float * __restrict__ myData,
+const float * __restrict__ myCost,float * __restrict__ data,float * __restrict__ cost);
 
-        float (*function) (const float * __restrict__ &);
-        __device__ void getData(const int index,const float * __restrict__ myData,
-        const float * __restrict__ myCost,float * __restrict__ data,float * __restrict__ cost);
-        __device__ void getBest(int * __restrict__ indexBest,float * __restrict__ costBest);
+__device__ void getBest(int * __restrict__ indexBest,float * __restrict__ costBest);
 
-        __device__ void updatePop(const int * __restrict__ random_particles,float * __restrict__ my_Data,
-        float * __restrict__ my_cost, curandStateMtgp32 *localState);
+__device__ void updatePop(const int * __restrict__ random_particles,float * __restrict__ my_Data,
+float * __restrict__ my_cost, curandStateMtgp32 *localState);
 
-        __device__ void msos(float * __restrict__ myData,float * __restrict__ cost,curandStateMtgp32 *localState);
-        __device__ void woa(float * __restrict__ myData,float * __restrict__ cost,curandStateMtgp32 *localState,
-        int current_iter,int * __restrict__ indexBest);
+__device__ void msos(float (*f)(float*),float * __restrict__ myData,float * __restrict__ cost,curandStateMtgp32 *localState);
 
-        __host__ __device__ void woam(curandStateMtgp32 *devMTGPStates, int dimension,int max_iter,
-        float bound_low,float bound_high,float (*function)(const float* __restrict__ &))
-};
+__device__ void woa(float (*f)(float*),float * __restrict__ myData,float * __restrict__ cost,curandStateMtgp32 *localState,
+int current_iter,int * __restrict__ indexBest,float bound_low, float bound_high);
 
 
 #endif //oa

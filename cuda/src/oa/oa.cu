@@ -1,79 +1,68 @@
-#include <curand.h>
-#include <curand_kernel.h>
-#include <thrust/device_vector.h>
-/// include MTGP host helper functions
-#include <curand_mtgp32_host.h>
-/// include MTGP pre-computed parameter sets
-#include <curand_mtgp32dc_p_11213.h>
 #include "oa.h"
 
-/// Initialise the host and device parameters
-/// Setup MTGP prng states
 /// @param f Function to be evaluvated
 /// @param l lower bound of the function
 /// @param u upper bound of the function
-OA::OA(float (*f)(float*), float l, float u){
-    function = f;
-    bound_low = l;
-    bound_high = u;
-    cudaMalloc((void**) &device_solution, (sizeof(float)));
+vector<float> run(float (*f)(float*), float l, float u){
+    vector<float> global_best_solution;
 
-    /// Allocate space for prng states on device
-    cudaMalloc((void **)&devMTGPStates, dimension * 
-    sizeof(curandStateMtgp32));
-     
-    /// Allocate space for MTGP kernel parameters
-    cudaMalloc((void**)&devKernelParams, sizeof(mtgp32_kernel_params));
+    float *host_solution,*device_solution;
+    cudaMalloc((void**)&device_solution, sizeof(float));
+    curandStateMtgp32 *devMTGPStates = myrandom::die.devMTGPStates;
 
-    /// Reformat from predefined parameter sets to kernel format,
-    /// and copy kernel parameters to device memory
-    curandMakeMTGP32Constants(mtgp32dc_params_fast_11213, devKernelParams);
-    
-    /// Initialize one state per thread block
-    curandMakeMTGP32KernelState(devMTGPStates, 
-                mtgp32dc_params_fast_11213, devKernelParams, psize, time(NULL));
+    woam<<<1,32>>>(devMTGPStates,f,l,u, device_solution);
+
+    cudaMemcpy(&host_solution, device_solution, (sizeof(float)), cudaMemcpyDeviceToHost);
+    global_best_solution.push_back(*host_solution);
+    cudaFree(device_solution);
+    return global_best_solution;
 }
 
 /// The main function for WOAM
-__host__ __device__ void OA::woam(){
+/// @param f Function to be evaluvated
+/// @param l lower bound of the function
+/// @param u upper bound of the function
+__global__ void woam(curandStateMtgp32 *devMTGPStates,float (*f)(float*),float l, float u, float*solution){
+    const int max_iter = 30;
     int myID = threadIdx.x;
+    const int dimension = 30;
     curandStateMtgp32 localState = devMTGPStates[myID];
-    float myData[30],cost,costBest;
+    float myData[dimension],cost,costBest;
     int indexBest=myID;
 
     for (int j = 0; j < dimension; j++){
         /// generate data
-        myData[j] = (float)(bound_low + (curand_uniform(&localState)* (bound_high - bound_low)));
+        myData[j] = (float)(l + (curand_uniform(&localState)* (u - l)));
     }
-    cost = function(&myData[0]);
+    cost = f(&myData[0]);
     costBest = cost;
 
     getBest(&indexBest,&costBest);
 
     for (int k = 0; k < max_iter; k++){
         // mMSOS Component
-        msos(&myData[0],&cost,&localState);
+        msos(f,&myData[0],&cost,&localState);
 
         costBest = cost;
         indexBest=myID;
         getBest(&indexBest,&costBest);
 
         // WOA Component
-        woa(&myData[0],&cost,&localState,k,&indexBest);
+        woa(f,&myData[0],&cost,&localState,k,&indexBest, l,u);
 
         costBest = cost;
         indexBest=myID;
         getBest(&indexBest,&costBest);
     }
-    *device_solution = costBest;
-
+    *solution = costBest;
+    devMTGPStates[myID] = localState;
 }
 
 /// Finds the best cost in the population
 /// Uses a butterfly reduction
 /// @param indexBest Index of the individual with minimum cost, will be updated
 /// @param costBest Cost of the individual with minimum cost, will be updated
-__device__ void OA::getBest(int * __restrict__ indexBest,float * __restrict__ costBest){\
+__device__ void getBest(int * __restrict__ indexBest,float * __restrict__ costBest){\
     int ID = *indexBest;
     float Best = *costBest;
     float costTemp;
@@ -96,8 +85,9 @@ __device__ void OA::getBest(int * __restrict__ indexBest,float * __restrict__ co
 /// @param myCost Pointer for my cost
 /// @param data Pointer to the float array to which we will copy the other individual's data
 /// @param cost Pointer to the float to which we will copy the other individual's cost
-__device__ void OA::getData(const int index,const float * __restrict__ myData,const float * __restrict__ myCost,
+__device__ void getData(const int index,const float * __restrict__ myData,const float * __restrict__ myCost,
     float * __restrict__ data,float * __restrict__ cost){
+    const int dimension = 30;
     *cost = __shfl_sync(0xffffffff, *myCost,index);
     for (int i = 0; i < dimension; i++){
         data[i] = __shfl_sync(0xffffffff, myData[i],index);
@@ -109,8 +99,9 @@ __device__ void OA::getData(const int index,const float * __restrict__ myData,co
 /// @param myData Pointer for my data
 /// @param myCost Pointer for my cost
 /// @param localState MTGP32 PRG state
-__device__ void OA::updatePop(const int * __restrict__ random_particles,float * __restrict__ my_Data,
+__device__ void updatePop(float (*f)(float*),const int * __restrict__ random_particles,float * __restrict__ my_Data,
     float * __restrict__ my_cost, curandStateMtgp32 *localState){
+    const int dimension = 30;
     
     float cost_rp[2],data_rp[2*30];
 
@@ -127,7 +118,7 @@ __device__ void OA::updatePop(const int * __restrict__ random_particles,float * 
     hIndex = highFitness * dimension;
     lIndex = lowFitness * dimension;
 
-    float my_Data_kp1[30];
+    float my_Data_kp1[dimension];
     float my_cost_kp1;
     
     int bf1,bf2,x,y,z;
@@ -144,8 +135,8 @@ __device__ void OA::updatePop(const int * __restrict__ random_particles,float * 
     }
 
     /// Calculate the costs
-    my_cost_kp1 = function(my_Data_kp1);
-    cost_rp[0] = function(data_rp);
+    my_cost_kp1 = f(my_Data_kp1);
+    cost_rp[0] = f(data_rp);
 
     /// If the new cost is the minima update my individual data
     if(my_cost_kp1 < *my_cost){
@@ -179,8 +170,9 @@ __device__ void OA::updatePop(const int * __restrict__ random_particles,float * 
 /// @param myData Vector array of data of individual
 /// @param cost Cost of myData for the given function
 /// @param localState MTGP32 PRG state
-__device__ void OA::msos(float * __restrict__ myData,float * __restrict__ cost,curandStateMtgp32 *localState){
+__device__ void msos(float * __restrict__ myData,float * __restrict__ cost,curandStateMtgp32 *localState){
     int random_particles[2];
+    const int psize = 32;
     int my_index = threadIdx.x;
     random_particles[0] = int(curand_uniform(localState) * (psize-1))-1;
     if(random_particles[0] >= my_index)
@@ -199,14 +191,17 @@ __device__ void OA::msos(float * __restrict__ myData,float * __restrict__ cost,c
 /// @param myData Vector array of data of individual
 /// @param cost Cost of myData for the given function
 /// @param localState MTGP32 PRG state
-__device__ void OA::woa(float * __restrict__ myData,float * __restrict__ myCost,curandStateMtgp32 *localState,
-    int current_iter,int * __restrict__ indexBest){
+__device__ void woa(float (*f)(float*),float * __restrict__ myData,float * __restrict__ myCost,curandStateMtgp32 *localState,
+    int current_iter,int * __restrict__ indexBest, float bound_low, float bound_high){
+    const int max_iter = 30;
+    const int psize = 32;
+    const int dimension = 30;
     
     /// Decreases linearly from 2 to 0
-    float a_1 = 2.0 * (max_iter  - current_iter)/ max_iter;
+    const float a_1 = 2.0 * (max_iter  - current_iter)/ max_iter;
 
     /// Decreases linearly from -1 to -2
-    float a_2 = (-1.0 * (max_iter  - current_iter)/ max_iter) - 1.0;
+    const float a_2 = (-1.0 * (max_iter  - current_iter)/ max_iter) - 1.0;
 
     float l = (a_2 - 1)* curand_uniform(localState) + 1;
     
@@ -222,7 +217,7 @@ __device__ void OA::woa(float * __restrict__ myData,float * __restrict__ myCost,
     
     /// The arrays for data
     float * particles[2];
-    float cost_p[2],data_best[30],data_rp[30];
+    float cost_p[2],data_best[dimension],data_rp[dimension];
     
     /// The pointers are assigned for the respective data
     particles[0] = &data_best[0];
@@ -238,6 +233,7 @@ __device__ void OA::woa(float * __restrict__ myData,float * __restrict__ myCost,
     d[0] = &d_vals[0];
     d[1] = &d_vals[2];
     float a[2],c[2],r;
+    const float b = 0.8;
 
     // Remeber to check the random variable distribution bounds for index
     int p,alpha;
@@ -268,24 +264,5 @@ __device__ void OA::woa(float * __restrict__ myData,float * __restrict__ myCost,
         }
     }
 
-    *myCost = function(myData);
-}
-
-__global__ void dummy(){
-    for(int i = 0;i <100;i++)
-        i = i;
-}
-
-void dummy_parent(){
-    dummy<<<1,32>>>();
-}
-
-vector<float> OA::run(){
-    vector<float> global_best_solution;
-
-    woam();
-
-    cudaMemcpy(&host_solution, device_solution, (sizeof(float)), cudaMemcpyDeviceToHost);
-    global_best_solution.push_back(host_solution);
-    return global_best_solution;
+    *myCost = f(myData);
 }

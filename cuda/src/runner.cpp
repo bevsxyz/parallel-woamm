@@ -25,11 +25,9 @@ DataStats runFunc(int experiment, string func_name, float (*f)(float *), float l
     vector<vector<float>> f_bests_history;
     float time_temp = 0;
 
-    OA woam_optimization(f, l, u);
-    dummy_parent();
     for (int i = 0; i < experiment; i++){
         chrono::high_resolution_clock::time_point start = chrono::high_resolution_clock::now();
-        vector<float> f_best_history = woam_optimization.run();
+        vector<float> f_best_history = run(f, l, u);
         chrono::high_resolution_clock::time_point finish = chrono::high_resolution_clock::now();
         float f_best = f_best_history[f_best_history.size()-1];
         result.data.push_back(f_best);
