@@ -7,19 +7,14 @@ include(CTest)
 find_package(CUDA REQUIRED)
 message(STATUS "Found CUDA ${CUDA_VERSION_STRING} at ${CUDA_TOOLKIT_ROOT_DIR}")
 
+
 include_directories(${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES}) 
 
 add_library(whale STATIC
-        lib/mpgp32.cu
-        src/main.cpp
         src/oa/oa.cu
-        src/oa/oa.h
         src/func/func.cu
-        src/func/func.h
-        src/runner.h
-        src/runner.cpp
+        src/runner.cu
         src/data/data_stats.cpp
-        src/data/data_stats.h
         )
 
 target_compile_features(whale PUBLIC cxx_std_11)
@@ -28,7 +23,7 @@ target_compile_features(whale PUBLIC cxx_std_11)
 set_target_properties(whale
                        PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
 
-add_executable(whale_test src/main.cpp)
+add_executable(whale_test src/main.cu)
 
 set_property(TARGET whale_test 
              PROPERTY CUDA_SEPARABLE_COMPILATION ON)

@@ -1,15 +1,5 @@
-#include <cmath>
-#include <vector>
-#include <iostream>
-#include <fstream>
-#include <string>
-#include <chrono>
-#include <cuda.h>
-
 #include "runner.h"
-#include "./func/func.h"
-#include "./oa/oa.h"
-#include "./data/data_stats.h"
+
 
 using namespace std;
 
@@ -19,7 +9,7 @@ using namespace std;
 /// @param l low x bound
 /// @param u up x bound
 /// @return return result analysis
-DataStats runFunc(int experiment, string func_name, float (*f)(float *), float l, float u){
+DataStats runFunc(int experiment, string func_name, int f, float l, float u){
     DataStats result;
     result.func_name = func_name;
     vector<vector<float>> f_bests_history;

@@ -3,18 +3,35 @@
 /// @param f Function to be evaluvated
 /// @param l lower bound of the function
 /// @param u upper bound of the function
-vector<float> run(float (*f)(float*), float l, float u){
+vector<float> run(int f, float l, float u){
     vector<float> global_best_solution;
+    curandStateMtgp32 *devMTGPStates;      /// State array for MTGP32 generator
+    mtgp32_kernel_params *devKernelParams; /// Parameters for initialising PRG
 
     float *host_solution,*device_solution;
     cudaMalloc((void**)&device_solution, sizeof(float));
-    curandStateMtgp32 *devMTGPStates = myrandom::die.devMTGPStates;
+
+    /// Allocate space for prng states on device
+    cudaMalloc((void **)&devMTGPStates, 32 * sizeof(curandStateMtgp32));
+    
+    /// Allocate space for MTGP kernel parameters
+    cudaMalloc((void**)&devKernelParams, sizeof(mtgp32_kernel_params));
+
+    /// Reformat from predefined parameter sets to kernel format,
+    /// and copy kernel parameters to device memory
+    curandMakeMTGP32Constants(mtgp32dc_params_fast_11213, devKernelParams);
+    
+    /// Initialize one state per thread block
+    curandMakeMTGP32KernelState(devMTGPStates, 
+                mtgp32dc_params_fast_11213, devKernelParams, 32, time(NULL));
 
     woam<<<1,32>>>(devMTGPStates,f,l,u, device_solution);
 
     cudaMemcpy(&host_solution, device_solution, (sizeof(float)), cudaMemcpyDeviceToHost);
     global_best_solution.push_back(*host_solution);
     cudaFree(device_solution);
+    cudaFree(devMTGPStates);
+    cudaFree(devKernelParams);
     return global_best_solution;
 }
 
@@ -22,7 +39,7 @@ vector<float> run(float (*f)(float*), float l, float u){
 /// @param f Function to be evaluvated
 /// @param l lower bound of the function
 /// @param u upper bound of the function
-__global__ void woam(curandStateMtgp32 *devMTGPStates,float (*f)(float*),float l, float u, float*solution){
+__global__ void woam(curandStateMtgp32 *devMTGPStates,int f,float l, float u, float*solution){
     const int max_iter = 30;
     int myID = threadIdx.x;
     const int dimension = 30;
@@ -34,7 +51,7 @@ __global__ void woam(curandStateMtgp32 *devMTGPStates,float (*f)(float*),float l
         /// generate data
         myData[j] = (float)(l + (curand_uniform(&localState)* (u - l)));
     }
-    cost = f(&myData[0]);
+    func(f,&myData[0],&cost);
     costBest = cost;
 
     getBest(&indexBest,&costBest);
@@ -55,7 +72,6 @@ __global__ void woam(curandStateMtgp32 *devMTGPStates,float (*f)(float*),float l
         getBest(&indexBest,&costBest);
     }
     *solution = costBest;
-    devMTGPStates[myID] = localState;
 }
 
 /// Finds the best cost in the population
@@ -99,7 +115,7 @@ __device__ void getData(const int index,const float * __restrict__ myData,const 
 /// @param myData Pointer for my data
 /// @param myCost Pointer for my cost
 /// @param localState MTGP32 PRG state
-__device__ void updatePop(float (*f)(float*),const int * __restrict__ random_particles,float * __restrict__ my_Data,
+__device__ void updatePop(int f,const int * __restrict__ random_particles,float * __restrict__ my_Data,
     float * __restrict__ my_cost, curandStateMtgp32 *localState){
     const int dimension = 30;
     
@@ -135,8 +151,8 @@ __device__ void updatePop(float (*f)(float*),const int * __restrict__ random_par
     }
 
     /// Calculate the costs
-    my_cost_kp1 = f(my_Data_kp1);
-    cost_rp[0] = f(data_rp);
+    func(f,my_Data_kp1,&my_cost_kp1);
+    func(f,data_rp,&cost_rp[0]);
 
     /// If the new cost is the minima update my individual data
     if(my_cost_kp1 < *my_cost){
@@ -170,7 +186,7 @@ __device__ void updatePop(float (*f)(float*),const int * __restrict__ random_par
 /// @param myData Vector array of data of individual
 /// @param cost Cost of myData for the given function
 /// @param localState MTGP32 PRG state
-__device__ void msos(float * __restrict__ myData,float * __restrict__ cost,curandStateMtgp32 *localState){
+__device__ void msos(int f,float * __restrict__ myData,float * __restrict__ cost,curandStateMtgp32 *localState){
     int random_particles[2];
     const int psize = 32;
     int my_index = threadIdx.x;
@@ -183,7 +199,7 @@ __device__ void msos(float * __restrict__ myData,float * __restrict__ cost,curan
     if(random_particles[1] >= random_particles[0])
         random_particles[1]++;
     
-    updatePop(&random_particles[0],myData,cost,localState);
+    updatePop(f,&random_particles[0],myData,cost,localState);
 }
 
 
@@ -191,7 +207,7 @@ __device__ void msos(float * __restrict__ myData,float * __restrict__ cost,curan
 /// @param myData Vector array of data of individual
 /// @param cost Cost of myData for the given function
 /// @param localState MTGP32 PRG state
-__device__ void woa(float (*f)(float*),float * __restrict__ myData,float * __restrict__ myCost,curandStateMtgp32 *localState,
+__device__ void woa(int f,float * __restrict__ myData,float * __restrict__ myCost,curandStateMtgp32 *localState,
     int current_iter,int * __restrict__ indexBest, float bound_low, float bound_high){
     const int max_iter = 30;
     const int psize = 32;
@@ -264,5 +280,5 @@ __device__ void woa(float (*f)(float*),float * __restrict__ myData,float * __res
         }
     }
 
-    *myCost = f(myData);
+    func(f,myData,myCost);
 }

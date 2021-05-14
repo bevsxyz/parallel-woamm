@@ -3,9 +3,24 @@
 #define fpsize 30
 #define PI 3.14159265358979323846
 
+__device__ void func(int f, const float * __restrict__ mydata,float * __restrict__ cost){
+    if(f==1){
+        *cost = sphere(mydata);
+    }
+    else if(f==2){
+        *cost = rosenbrock(mydata);
+    }
+    else if(f==3){
+        *cost = rastrigin(mydata);
+    }     
+    else if(f==4){
+        *cost = griewangk(mydata);
+    }
+}
+
 /// Function 1, Implementation of Sphere function
 /// @param x Array vector of float
-__device__ float func::sphere(float * __restrict__ x){
+__device__ float sphere(const float * __restrict__ x){
     float result = 0;
     for (int i = 0; i < fpsize; i++){
         result += x[i] * x[i];
@@ -15,7 +30,7 @@ __device__ float func::sphere(float * __restrict__ x){
 
 /// Function 2, Implementation of Rosenbrock's function
 /// @param x Array vector of float
-__device__ float func::rosenbrock(float * __restrict__ x){
+__device__ float rosenbrock(const float * __restrict__ x){
     float result = 0;
     for (int i = 0; i < fpsize - 1; i++){
         double a = x[i] * x[i] - x[i+1];
@@ -27,7 +42,7 @@ __device__ float func::rosenbrock(float * __restrict__ x){
 
 /// Function 3, Implementation of Rastrigin's function
 /// @param x Array vector of float
-__device__ float func::rastrigin(float * __restrict__ x){
+__device__ float rastrigin(const float * __restrict__ x){
     float result = 0;
     for (int i = 0; i < fpsize ; i++){
         result += x[i] * x[i] - 10.0 * __cosf((2 * PI * x[i]));
@@ -36,12 +51,12 @@ __device__ float func::rastrigin(float * __restrict__ x){
 }
 
 /// Function 4, Implementation of Griewangk function
-__device__ float func::griewangk(float * __restrict__ x){
+__device__ float griewangk(const float * __restrict__ x){
     float sum = 0;
     float product = 1;
     for (int i = 0; i < fpsize ; i++){
         sum += x[i] * x[i] / 4000;
-        product *= __cosf(x[i]*rsqrtf(i+1));
+        product *= __cosf(x[i]*sqrtf(i+1));
     }
     return 1.0 + sum - product;
 }

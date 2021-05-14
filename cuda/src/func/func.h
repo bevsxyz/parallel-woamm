@@ -7,17 +7,15 @@
 #ifndef func_h
 #define func_h
 
-namespace func {
-    // Variable dimensions unimodal functions
+__device__ float sphere(const float * x);
+__device__ float rosenbrock(const float * x);
 
-    float sphere(float * x);
-    float rosenbrock(float * x);
+// Variable dimensions multimodal functions
 
-    // Variable dimensions multimodal functions
+__device__ float rastrigin(const float * x);
+__device__ float griewangk(const float * x);
 
-    float rastrigin(float * x);
-    float griewangk(float * x);
-}
+__device__ void func(int f, const float * __restrict__ mydata,float * __restrict__ cost);
 
 #endif
 
