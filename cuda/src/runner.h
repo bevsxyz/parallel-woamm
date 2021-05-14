@@ -13,7 +13,7 @@
 
 using namespace std;
 
-DataStats runFunc(int experiment, string func_name, __device__ float (*f)(const float *), float l, float u);
+DataStats runFunc(int experiment, string func_name, float (*f)(float *), float l, float u);
 
 void output_func(string func_name, DataStats result, vector<vector<float>> f_bests_history);
 

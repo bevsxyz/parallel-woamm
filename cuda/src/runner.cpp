@@ -1,10 +1,10 @@
-#include <ctime>
 #include <cmath>
 #include <vector>
 #include <iostream>
 #include <fstream>
 #include <string>
 #include <chrono>
+#include <cuda.h>
 
 #include "runner.h"
 #include "./func/func.h"
@@ -19,13 +19,14 @@ using namespace std;
 /// @param l low x bound
 /// @param u up x bound
 /// @return return result analysis
-DataStats runFunc(int experiment, string func_name, __device__ float (*f)(const float * __restrict__ &), float l, float u){
+DataStats runFunc(int experiment, string func_name, float (*f)(float *), float l, float u){
     DataStats result;
     result.func_name = func_name;
     vector<vector<float>> f_bests_history;
     float time_temp = 0;
 
     OA woam_optimization(f, l, u);
+    dummy_parent();
     for (int i = 0; i < experiment; i++){
         chrono::high_resolution_clock::time_point start = chrono::high_resolution_clock::now();
         vector<float> f_best_history = woam_optimization.run();
