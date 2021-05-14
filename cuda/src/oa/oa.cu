@@ -4,15 +4,18 @@
 /// @param l lower bound of the function
 /// @param u upper bound of the function
 vector<float> run(int f, float l, float u){
+
+    int blocks = 6;
+    int threads = 32;
     vector<float> global_best_solution;
     curandStateMtgp32 *devMTGPStates;      /// State array for MTGP32 generator
     mtgp32_kernel_params *devKernelParams; /// Parameters for initialising PRG
 
-    float host_solution,*device_solution;
-    cudaMalloc((void**)&device_solution, sizeof(float));
+    float host_solution[blocks],*device_solution;
+    cudaMalloc((void**)&device_solution, blocks* sizeof(float));
 
     /// Allocate space for prng states on device
-    cudaMalloc((void **)&devMTGPStates, 32 * sizeof(curandStateMtgp32));
+    cudaMalloc((void **)&devMTGPStates, blocks*threads * sizeof(curandStateMtgp32));
     
     /// Allocate space for MTGP kernel parameters
     cudaMalloc((void**)&devKernelParams, sizeof(mtgp32_kernel_params));
@@ -23,13 +26,18 @@ vector<float> run(int f, float l, float u){
     
     /// Initialize one state per thread block
     curandMakeMTGP32KernelState(devMTGPStates, 
-                mtgp32dc_params_fast_11213, devKernelParams, 32, time(NULL));
+                mtgp32dc_params_fast_11213, devKernelParams, blocks*threads, time(NULL));
 
-    woam<<<1,32>>>(devMTGPStates,f,l,u, device_solution);
+    woam<<<blocks,threads>>>(devMTGPStates,f,l,u, device_solution);
 
-    cudaMemcpy(&host_solution, device_solution, (sizeof(float)), cudaMemcpyDeviceToHost);
+    cudaMemcpy(host_solution, device_solution, blocks* (sizeof(float)), cudaMemcpyDeviceToHost);
     
-    global_best_solution.push_back(host_solution);
+    float best = host_solution[0];
+    for(int i = 1; i < blocks; i++){
+        if(host_solution[i]<best)
+            best = host_solution[i];
+    }
+    global_best_solution.push_back(best);
     cudaFree(device_solution);
     cudaFree(devMTGPStates);
     cudaFree(devKernelParams);
@@ -44,8 +52,9 @@ vector<float> run(int f, float l, float u){
 __global__ void woam(curandStateMtgp32 *devMTGPStates,int f,float l, float u, float*solution){
     const int max_iter = 30;
     int myID = threadIdx.x;
+    int bID  = blockIdx.x; 
     const int dimension = 30;
-    curandStateMtgp32 localState = devMTGPStates[myID];
+    curandStateMtgp32 localState = devMTGPStates[(bID*32)+myID];
     float myData[dimension],cost,costBest;
     int indexBest=myID;
 
@@ -73,7 +82,8 @@ __global__ void woam(curandStateMtgp32 *devMTGPStates,int f,float l, float u, fl
         indexBest=myID;
         getBest(&indexBest,&costBest);
     }
-    solution[0] = costBest;
+    if(myID==0)
+        solution[bID] = costBest;
 }
 
 /// Finds the best cost in the population
