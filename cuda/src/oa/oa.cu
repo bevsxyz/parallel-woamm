@@ -3,6 +3,8 @@
 #define max_iter 30
 #define psize 32
 #define dimension 30
+#define PI 3.14159265358979323846
+#define b 0.8
 
 /// @param f Function to be evaluvated
 /// @param l lower bound of the function
@@ -220,7 +222,6 @@ __device__ void msos(int f,float * __restrict__ myData,float * __restrict__ cost
 /// @param localState MTGP32 PRG state
 __device__ void woa(int f,float * __restrict__ myData,float * __restrict__ myCost,curandStateMtgp32 *localState,
     int current_iter,int * __restrict__ indexBest, float bound_low, float bound_high){
-    const float PI = 3.14159265358979323846;
     
     /// Decreases linearly from 2 to 0
     const float a_1 = 2.0 * __fdividef((max_iter  - current_iter),max_iter);
@@ -241,12 +242,7 @@ __device__ void woa(int f,float * __restrict__ myData,float * __restrict__ myCos
         index[1]++;
 
     /// The variables for values that change according to predicate
-    float * d[2];
-    float d_vals[3];
-    d[0] = &d_vals[0];
-    d[1] = &d_vals[2];
-    float a[2],c[2],r;
-    const float b = 0.8;
+    float a[2],c[2],d,r;
 
     // Remeber to check the random variable distribution bounds for index
     r = curand_uniform(localState);
@@ -256,31 +252,21 @@ __device__ void woa(int f,float * __restrict__ myData,float * __restrict__ myCos
     a[1] = __expf(b * l) * __cosf( 2.0 * PI * l);
     
     /// p: 0 or 1
-    int p=beta >= 0.5;
+    const int p=beta >= 0.5;
     /// alpha 0 when p == 0 && (abs(a) < 1)
-    int alpha = !p && (fabsf(a[0]) >= 1);
+    const int alpha = !p && (fabsf(a[0]) >= 1);
 
-    /// The arrays for data
-    float * particles[2];
-    float cost_p[2],data_best[dimension],data_rp[dimension];
-    
-    /// The pointers are assigned for the respective data
-    particles[0] = &data_best[0];
-    particles[1] = &data_rp[0];
+    /// The variables for other individual which can be the best or random
+    float data_p[dimension],cost_p;
 
     /// Get the data from the other threads in the warp
 
-    /// Pending avoid two calls to getData could improve speedup
-    getData(index[0],myData,myCost,particles[0],&cost_p[0]);
-    getData(index[1],myData,myCost,particles[1],&cost_p[1]);
+    getData(index[alpha],myData,myCost,data_p,&cost_p);
 
     for (int j = 0; j < dimension; j++) {
+        d = fabsf(c[p] * data_p[j] - myData[j]);
 
-        d[0][0] = c[0] * particles[0][j];
-        d[0][1] = c[0] * particles[1][j];
-        d[1][0] = c[1] * particles[0][j];
-
-        myData[j] = particles[alpha][j] + a[p] * fabsf(d[p][alpha]-myData[j]);
+        myData[j] = data_p[j] + a[p] * d;
         /// check solution bound
         if (myData[j] < bound_low){
             myData[j] = bound_low;
