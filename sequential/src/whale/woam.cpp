@@ -85,20 +85,20 @@ void WOAM::msos(){
 void WOAM::woa(int k){
     float a_1 = 2.0 * (max_iter  - k)/ max_iter;  /// Decreases linearly from 2 to 0
     float a_2 = (-1.0 * (max_iter  - k)/ max_iter) - 1.0; /// Decreases linearly from -1 to -2
-
+    int particle_rand;
+    float beta,l,r,a,c,d,a_abs;
     for (int i = 0; i < psize; i++){
-        float beta = rnd->real();
-        int particle_rand = int(rnd->real() * psize);
-        float l = (a_2 - 1)* rnd->real() + 1;
+        beta = rnd->real();
+        particle_rand = int(rnd->real() * psize);
+        l = (a_2 - 1)* rnd->real() + 1;
+        r = rnd->real();
+        a = 2.0 * a_1 * r - a_1;
+        c = 2.0 * r;
+        a_abs = fabs(a);
 
         for (int j = 0; j < dimension; j++) {
             if (beta < 0.5) {
-                float r = rnd->real();
-                float a = 2.0 * a_1 * r - a_1;
-                float c = 2.0 * r;
-                float d;
-
-                if (fabs(a) < 1) {
+                if (a_abs < 1) {
                     d = fabs(c * population.data_best[j] - population.data[i][j]);
                     population.data[i][j] = population.data_best[j] - a * d;
                 } else {
