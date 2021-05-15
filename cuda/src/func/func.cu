@@ -16,6 +16,12 @@ __device__ void func(int f, const float * __restrict__ mydata,float * __restrict
     else if(f==4){
         *cost = griewangk(mydata);
     }
+    else if(f==5){
+        *cost = f8(mydata);
+    }
+    else if(f==6){
+        *cost = brown(mydata);
+    }
 }
 
 /// Function 1, Implementation of Sphere function
@@ -59,4 +65,22 @@ __device__ float griewangk(const float * __restrict__ x){
         product *= __cosf(x[i]*rsqrtf(i+1));
     }
     return 1.0 + sum - product;
+}
+
+__device__ float f8(const float * __restrict__ x){
+    float result = 0;
+    for (int i = 0; i < fpsize ; i++){
+        result -= x[i] * __sinf(sqrtf(fabsf(x[i])));
+    }
+    return result;
+}
+
+__device__ float brown(const float * __restrict__ x){
+    float result = 0;
+    float xp12;
+    for (int i = 0; i < fpsize-1 ; i++){
+        xp12 = x[i+1]*x[i+1];
+        result += __powf(x[i]*x[i],(xp12+1)) + __powf(xp12,xp12+1);
+    }
+    return result;
 }

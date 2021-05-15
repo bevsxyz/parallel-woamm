@@ -11,7 +11,7 @@
 /// @param u upper bound of the function
 vector<float> run(int f, float l, float u){
 
-    int blocks = 6;
+    int blocks = 1;
     int threads = 32;
     vector<float> global_best_solution;
     curandStateMtgp32 *devMTGPStates;      /// State array for MTGP32 generator
@@ -56,8 +56,8 @@ vector<float> run(int f, float l, float u){
 /// @param l lower bound of the function
 /// @param u upper bound of the function
 __global__ void woam(curandStateMtgp32 *devMTGPStates,int f,float l, float u, float*solution){
-    int myID = threadIdx.x;
-    int bID  = blockIdx.x;
+    const int myID = threadIdx.x;
+    const int bID  = blockIdx.x;
     curandStateMtgp32 localState = devMTGPStates[(bID*32)+myID];
     float myData[dimension],cost,costBest;
     int indexBest=myID;
@@ -94,7 +94,7 @@ __global__ void woam(curandStateMtgp32 *devMTGPStates,int f,float l, float u, fl
 /// Uses a butterfly reduction
 /// @param indexBest Index of the individual with minimum cost, will be updated
 /// @param costBest Cost of the individual with minimum cost, will be updated
-__device__ void getBest(int * __restrict__ indexBest,float * __restrict__ costBest){\
+__device__ __forceinline__ void getBest(int * __restrict__ indexBest,float * __restrict__ costBest){\
     int ID = *indexBest;
     float Best = *costBest;
     float costTemp;
@@ -111,20 +111,6 @@ __device__ void getBest(int * __restrict__ indexBest,float * __restrict__ costBe
     *indexBest = ID;
 }
 
-/// Get data from individual "index"
-/// @param index Index of the individual to copy data from
-/// @param myData Pointer for my data
-/// @param myCost Pointer for my cost
-/// @param data Pointer to the float array to which we will copy the other individual's data
-/// @param cost Pointer to the float to which we will copy the other individual's cost
-__device__ void getData(const int index,const float * __restrict__ myData,const float * __restrict__ myCost,
-    float * __restrict__ data,float * __restrict__ cost){
-    *cost = __shfl_sync(0xffffffff, *myCost,index);
-    for (int i = 0; i < dimension; i++){
-        data[i] = __shfl_sync(0xffffffff, myData[i],index);
-    }
-}
-
 /// Update the population for msos
 /// @param random_particles Array of the two random individuals picked
 /// @param myData Pointer for my data
@@ -133,35 +119,35 @@ __device__ void getData(const int index,const float * __restrict__ myData,const 
 __device__ void updatePop(int f,const int * __restrict__ random_particles,float * __restrict__ my_Data,
     float * __restrict__ my_cost, curandStateMtgp32 *localState){
     
-    float cost_rp[2],data_rp[2*30];
+    float cost_rp[2],data_rp[dimension];
 
-    getData(random_particles[0],my_Data,my_cost,data_rp,&cost_rp[0]);
-    getData(random_particles[1],my_Data,my_cost,&data_rp[dimension],&cost_rp[1]);
+    cost_rp[0] = __shfl_sync(0xffffffff,*my_cost ,random_particles[0]);
+    cost_rp[1] = __shfl_sync(0xffffffff,*my_cost ,random_particles[1]);
 
     /// Calculate Fitness
-    int highFitness, lowFitness, hIndex , lIndex;
+    int hIndex , lIndex;
 
-    highFitness = cost_rp[0] < cost_rp[1];
-    lowFitness = !highFitness;
+    hIndex = cost_rp[0] < cost_rp[1];
+    lIndex = !hIndex;
 
-    /// Also the corresponding starting indices of the high and low fitness individuals
-    hIndex = highFitness * dimension;
-    lIndex = lowFitness * dimension;
+    float highFitness, lowFitness;
 
     float my_Data_kp1[dimension];
     float my_cost_kp1;
     
-    int bf1,bf2,x,y,z;
+    int bf1,bf2;
     float mv;
 
     bf1 = 1 + curand_uniform(localState) * 2;
     bf2 = 1 + curand_uniform(localState) * 2;
 
     /// Calculate the k+1 population values
-    for (x = 0,y=lIndex,z=hIndex; x < dimension; x++,y++,z++){
-        mv = __fdividef((my_Data[x] + data_rp[z]),2);
-        my_Data_kp1[x] = my_Data[x] + (curand_uniform(localState) * (data_rp[y] - mv*bf1));
-        data_rp[x] = data_rp[z]  + (curand_uniform(localState) * (data_rp[y] - mv*bf2));
+    for (int i = 0; i < dimension; i++){
+        highFitness = __shfl_sync(0xffffffff, my_Data[i],random_particles[hIndex]);
+        lowFitness = __shfl_sync(0xffffffff, my_Data[i],random_particles[lIndex]);
+        mv = __fdividef((my_Data[i] + highFitness),2);
+        my_Data_kp1[i] = my_Data[i] + (curand_uniform(localState) * (lowFitness - mv*bf1));
+        data_rp[i] = highFitness  + (curand_uniform(localState) * (lowFitness - mv*bf2));
     }
 
     /// Calculate the costs
@@ -177,11 +163,11 @@ __device__ void updatePop(int f,const int * __restrict__ random_particles,float 
 
     /// Need to implement the update of random indivdual
     int myID = threadIdx.x;
-    int index=myID,indexTemp, rindex=random_particles[highFitness];
+    int index=myID,indexTemp;
     float costTemp;
     for(int i = 0; i < 32; i++){
         costTemp = __shfl_sync(0xffffffff, cost_rp[0],i);
-        indexTemp = __shfl_sync(0xffffffff, rindex,i);
+        indexTemp = __shfl_sync(0xffffffff, random_particles[hIndex],i);
         if(indexTemp == myID){
             if(*my_cost>costTemp){
                 index = i;
@@ -245,28 +231,28 @@ __device__ void woa(int f,float * __restrict__ myData,float * __restrict__ myCos
     float a[2],c[2],d,r;
 
     // Remeber to check the random variable distribution bounds for index
-    r = curand_uniform(localState);
-    c[0] = 2.0 * r;
-    c[1] = 1;
-    a[0] = -(2.0 * a_1 * r - a_1);
-    a[1] = __expf(b * l) * __cosf( 2.0 * PI * l);
+    
     
     /// p: 0 or 1
     const int p=beta >= 0.5;
-    /// alpha 0 when p == 0 && (abs(a) < 1)
-    const int alpha = !p && (fabsf(a[0]) >= 1);
-
+    int alpha;
     /// The variables for other individual which can be the best or random
-    float data_p[dimension],cost_p;
-
-    /// Get the data from the other threads in the warp
-
-    getData(index[alpha],myData,myCost,data_p,&cost_p);
+    float data_p;
 
     for (int j = 0; j < dimension; j++) {
-        d = fabsf(c[p] * data_p[j] - myData[j]);
+        r = curand_uniform(localState);
+        c[0] = 2.0 * r;
+        c[1] = 1;
+        a[0] = -(2.0 * a_1 * r - a_1);
+        a[1] = __expf(b * l) * __cosf( 2.0 * PI * l);
+        /// alpha 0 when p == 0 && (abs(a) < 1)
+        alpha = !p && (fabsf(a[0]) >= 1);
 
-        myData[j] = data_p[j] + a[p] * d;
+        data_p = __shfl_sync(0xffffffff, myData[j],index[alpha]);
+        
+        d = fabsf(c[p] * data_p - myData[j]);
+
+        myData[j] = data_p + a[p] * d;
         /// check solution bound
         if (myData[j] < bound_low){
             myData[j] = bound_low;

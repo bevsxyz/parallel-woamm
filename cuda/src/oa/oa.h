@@ -21,9 +21,6 @@ using namespace std;
 vector<float> run(int f, float l, float u);    
 __global__ void woam(curandStateMtgp32 *devMTGPStates,int f,float l, float u, float*solution);
 
-__device__ void getData(const int index,const float * __restrict__ myData,
-const float * __restrict__ myCost,float * __restrict__ data,float * __restrict__ cost);
-
 __device__ void getBest(int * __restrict__ indexBest,float * __restrict__ costBest);
 
 __device__ void updatePop(int f,const int * __restrict__ random_particles,float * __restrict__ my_Data,
