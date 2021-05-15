@@ -1,5 +1,9 @@
 #include "oa.h"
 
+#define max_iter 30
+#define psize 32
+#define dimension 30
+
 /// @param f Function to be evaluvated
 /// @param l lower bound of the function
 /// @param u upper bound of the function
@@ -50,10 +54,8 @@ vector<float> run(int f, float l, float u){
 /// @param l lower bound of the function
 /// @param u upper bound of the function
 __global__ void woam(curandStateMtgp32 *devMTGPStates,int f,float l, float u, float*solution){
-    const int max_iter = 30;
     int myID = threadIdx.x;
-    int bID  = blockIdx.x; 
-    const int dimension = 30;
+    int bID  = blockIdx.x;
     curandStateMtgp32 localState = devMTGPStates[(bID*32)+myID];
     float myData[dimension],cost,costBest;
     int indexBest=myID;
@@ -115,7 +117,6 @@ __device__ void getBest(int * __restrict__ indexBest,float * __restrict__ costBe
 /// @param cost Pointer to the float to which we will copy the other individual's cost
 __device__ void getData(const int index,const float * __restrict__ myData,const float * __restrict__ myCost,
     float * __restrict__ data,float * __restrict__ cost){
-    const int dimension = 30;
     *cost = __shfl_sync(0xffffffff, *myCost,index);
     for (int i = 0; i < dimension; i++){
         data[i] = __shfl_sync(0xffffffff, myData[i],index);
@@ -129,7 +130,6 @@ __device__ void getData(const int index,const float * __restrict__ myData,const 
 /// @param localState MTGP32 PRG state
 __device__ void updatePop(int f,const int * __restrict__ random_particles,float * __restrict__ my_Data,
     float * __restrict__ my_cost, curandStateMtgp32 *localState){
-    const int dimension = 30;
     
     float cost_rp[2],data_rp[2*30];
 
@@ -200,7 +200,6 @@ __device__ void updatePop(int f,const int * __restrict__ random_particles,float 
 /// @param localState MTGP32 PRG state
 __device__ void msos(int f,float * __restrict__ myData,float * __restrict__ cost,curandStateMtgp32 *localState){
     int random_particles[2];
-    const int psize = 32;
     int my_index = threadIdx.x;
     random_particles[0] = int(curand_uniform(localState) * (psize-1))-1;
     if(random_particles[0] >= my_index)
@@ -221,9 +220,6 @@ __device__ void msos(int f,float * __restrict__ myData,float * __restrict__ cost
 /// @param localState MTGP32 PRG state
 __device__ void woa(int f,float * __restrict__ myData,float * __restrict__ myCost,curandStateMtgp32 *localState,
     int current_iter,int * __restrict__ indexBest, float bound_low, float bound_high){
-    const int max_iter = 30;
-    const int psize = 32;
-    const int dimension = 30;
     const float PI = 3.14159265358979323846;
     
     /// Decreases linearly from 2 to 0
@@ -243,18 +239,6 @@ __device__ void woa(int f,float * __restrict__ myData,float * __restrict__ myCos
     index[1] = int(curand_uniform(localState) * (psize-1))-1;
     if(index[0] >= threadIdx.x)
         index[1]++;
-    
-    /// The arrays for data
-    float * particles[2];
-    float cost_p[2],data_best[dimension],data_rp[dimension];
-    
-    /// The pointers are assigned for the respective data
-    particles[0] = &data_best[0];
-    particles[1] = &data_rp[0];
-
-    /// Get the data from the other threads in the warp
-    getData(index[0],myData,myCost,particles[0],&cost_p[0]);
-    getData(index[1],myData,myCost,particles[1],&cost_p[1]);
 
     /// The variables for values that change according to predicate
     float * d[2];
@@ -265,26 +249,38 @@ __device__ void woa(int f,float * __restrict__ myData,float * __restrict__ myCos
     const float b = 0.8;
 
     // Remeber to check the random variable distribution bounds for index
-    int p,alpha;
+    r = curand_uniform(localState);
+    c[0] = 2.0 * r;
+    c[1] = 1;
+    a[0] = -(2.0 * a_1 * r - a_1);
+    a[1] = __expf(b * l) * __cosf( 2.0 * PI * l);
+    
+    /// p: 0 or 1
+    int p=beta >= 0.5;
+    /// alpha 0 when p == 0 && (abs(a) < 1)
+    int alpha = !p && (fabsf(a[0]) >= 1);
+
+    /// The arrays for data
+    float * particles[2];
+    float cost_p[2],data_best[dimension],data_rp[dimension];
+    
+    /// The pointers are assigned for the respective data
+    particles[0] = &data_best[0];
+    particles[1] = &data_rp[0];
+
+    /// Get the data from the other threads in the warp
+
+    /// Pending avoid two calls to getData could improve speedup
+    getData(index[0],myData,myCost,particles[0],&cost_p[0]);
+    getData(index[1],myData,myCost,particles[1],&cost_p[1]);
 
     for (int j = 0; j < dimension; j++) {
-        r = curand_uniform(localState);
-        c[0] = 2.0 * r;
-        c[1] = 1;
 
-        d[0][0] = fabsf(c[0] * particles[0][j]-myData[j]);
-        d[0][1] = fabsf(c[0] * particles[1][j]-myData[j]);
-        d[1][0] = fabsf(c[1] * particles[0][j]-myData[j]);
+        d[0][0] = c[0] * particles[0][j];
+        d[0][1] = c[0] * particles[1][j];
+        d[1][0] = c[1] * particles[0][j];
 
-        a[0] = -(2.0 * a_1 * r - a_1);
-        a[1] = __expf(b * l) * __cosf( 2.0 * PI * l);
-
-        /// p: 0 or 1
-        p = beta >= 0.5;
-        /// alpha 0 when p == 0 && (abs(a) < 1)
-        alpha = !p && (fabsf(a[0]) >= 1);
-
-        myData[j] = particles[alpha][j] + a[p] * d[p][alpha];
+        myData[j] = particles[alpha][j] + a[p] * fabsf(d[p][alpha]-myData[j]);
         /// check solution bound
         if (myData[j] < bound_low){
             myData[j] = bound_low;
