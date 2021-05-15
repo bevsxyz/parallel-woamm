@@ -34,7 +34,7 @@ DataStats runFunc(int experiment, string func_name, float (*f)(vector<float> &),
         result.data.push_back(f_best);
         f_bests_history.push_back(f_best_history);
 
-        time_temp = chrono::duration_cast<chrono::milliseconds>(finish - start).count();
+        time_temp = chrono::duration_cast<chrono::microseconds>(finish - start).count();
         result.time.push_back(time_temp);
     }
     result.run();
@@ -50,7 +50,7 @@ DataStats runFunc(int experiment, string func_name, float (*f)(vector<float> &),
 void output_func(string func_name, DataStats result, vector<vector<float>> f_bests_history){
     /// output result stats
     ofstream file("./out/" + func_name + "_stats.csv");
-    file << "Mean,Median,Std,Range(low),Range(high),Time(ms)" << endl;
+    file << "Mean,Median,Std,Range(low),Range(high),Time(microseconds)" << endl;
     file << result.mean << "," ;
     file << result.median << "," ;
     file << result.stand << "," ;
@@ -87,7 +87,7 @@ void output_func(string func_name, DataStats result, vector<vector<float>> f_bes
 /// @param result_best best result for each function
 void output_all(vector<DataStats> result_bests){
     ofstream file("./out/woam_best_stats.csv");
-    file << "Function,Name,Mean,Median,Std,Range(low),Range(high),Time(ms)" << endl;
+    file << "Function,Name,Mean,Median,Std,Range(low),Range(high),Time(microseconds)" << endl;
     for (int i = 0; i < result_bests.size(); i++){
         file << i + 1 << ",";
         file << result_bests[i].func_name << ",";
