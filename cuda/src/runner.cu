@@ -13,11 +13,19 @@ DataStats runFunc(int experiment, string func_name, int f, float l, float u){
     DataStats result;
     result.func_name = func_name;
     vector<vector<float>> f_bests_history;
-    float time_temp = 0;
+    float time_temp, alloc_time;
+    float *device_solution;
+
+
+    chrono::high_resolution_clock::time_point start_alloc = chrono::high_resolution_clock::now();
+    cudaMalloc((void**)&device_solution, 1* sizeof(float));
+    chrono::high_resolution_clock::time_point finish_alloc = chrono::high_resolution_clock::now();
+    alloc_time = chrono::duration_cast<chrono::microseconds>(finish_alloc - start_alloc).count();
+
 
     for (int i = 0; i < experiment; i++){
         chrono::high_resolution_clock::time_point start = chrono::high_resolution_clock::now();
-        vector<float> f_best_history = run(f, l, u);
+        vector<float> f_best_history = run(f, l, u,device_solution);
         chrono::high_resolution_clock::time_point finish = chrono::high_resolution_clock::now();
         float f_best = f_best_history[f_best_history.size()-1];
         result.data.push_back(f_best);
@@ -26,6 +34,14 @@ DataStats runFunc(int experiment, string func_name, int f, float l, float u){
         time_temp = chrono::duration_cast<chrono::microseconds>(finish - start).count();
         result.time.push_back(time_temp);
     }
+
+    start_alloc = chrono::high_resolution_clock::now();
+    cudaFree(device_solution);
+    finish_alloc = chrono::high_resolution_clock::now();
+    alloc_time += chrono::duration_cast<chrono::microseconds>(finish_alloc - start_alloc).count();
+
+    cout << alloc_time << endl;
+
     result.run();
     output_func(func_name,result,f_bests_history);
     cout << "done: " << func_name << endl;

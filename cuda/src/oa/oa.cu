@@ -6,33 +6,18 @@
 #define PI 3.14159265358979323846
 #define b 0.8
 
+/// The main function to facilitiate memory copy and kernel calls
 /// @param f Function to be evaluvated
 /// @param l lower bound of the function
 /// @param u upper bound of the function
-vector<float> run(int f, float l, float u){
+/// @param device_solution The device array for solutions that is being reused
+vector<float> run(int f, float l, float u,float *device_solution){
 
     int blocks = 1;
     int threads = 32;
     vector<float> global_best_solution;
-    //curandStateMtgp32 *devMTGPStates;      /// State array for MTGP32 generator
-    //mtgp32_kernel_params *devKernelParams; /// Parameters for initialising PRG
 
-    float host_solution[blocks],*device_solution;
-    cudaMalloc((void**)&device_solution, blocks* sizeof(float));
-
-    /// Allocate space for prng states on device
-    //cudaMalloc((void **)&devMTGPStates, blocks*threads * sizeof(curandStateMtgp32));
-    
-    /// Allocate space for MTGP kernel parameters
-    //cudaMalloc((void**)&devKernelParams, sizeof(mtgp32_kernel_params));
-
-    /// Reformat from predefined parameter sets to kernel format,
-    /// and copy kernel parameters to device memory
-    //curandMakeMTGP32Constants(mtgp32dc_params_fast_11213, devKernelParams);
-    
-    /// Initialize one state per thread block
-    //curandMakeMTGP32KernelState(devMTGPStates, 
-      //          mtgp32dc_params_fast_11213, devKernelParams, blocks*threads, time(NULL));
+    float host_solution[blocks];
 
     woam<<<blocks,threads>>>(time(NULL),f,l,u, device_solution);
 
@@ -44,9 +29,6 @@ vector<float> run(int f, float l, float u){
             best = host_solution[i];
     }
     global_best_solution.push_back(best);
-    cudaFree(device_solution);
-    cudaFree(devMTGPStates);
-    cudaFree(devKernelParams);
     
     return global_best_solution;
 }
@@ -58,9 +40,9 @@ vector<float> run(int f, float l, float u){
 __global__ void woam(unsigned int seed,int f,float l, float u, float*solution){
     const int myID = threadIdx.x;
     const int bID  = blockIdx.x;
-    curandStatePhilox4_32_10_t localState;
+    curandState localState;
     curand_init(seed, /* the seed controls the sequence of random values that are produced */
-        myID, /* the sequence number is only important with multiple cores */
+        myID+(32*bID), /* the sequence number is only important with multiple cores */
         0, /* the offset is how much extra we advance in the sequence for each call, can be 0 */
         &localState);
     float myData[dimension],cost,costBest;
@@ -121,7 +103,7 @@ __device__ __forceinline__ void getBest(int * __restrict__ indexBest,float * __r
 /// @param myCost Pointer for my cost
 /// @param localState MTGP32 PRG state
 __device__ void updatePop(int f,const int * __restrict__ random_particles,float * __restrict__ my_Data,
-    float * __restrict__ my_cost, curandStatePhilox4_32_10_t *localState){
+    float * __restrict__ my_cost, curandState *localState){
     
     float cost_rp[2],data_rp[dimension];
 
@@ -190,7 +172,7 @@ __device__ void updatePop(int f,const int * __restrict__ random_particles,float 
 /// @param myData Vector array of data of individual
 /// @param cost Cost of myData for the given function
 /// @param localState MTGP32 PRG state
-__device__ void msos(int f,float * __restrict__ myData,float * __restrict__ cost,curandStatePhilox4_32_10_t *localState){
+__device__ void msos(int f,float * __restrict__ myData,float * __restrict__ cost,curandState *localState){
     int random_particles[2];
     int my_index = threadIdx.x;
     random_particles[0] = int(curand_uniform(localState) * (psize-1))-1;
@@ -210,7 +192,7 @@ __device__ void msos(int f,float * __restrict__ myData,float * __restrict__ cost
 /// @param myData Vector array of data of individual
 /// @param cost Cost of myData for the given function
 /// @param localState MTGP32 PRG state
-__device__ void woa(int f,float * __restrict__ myData,float * __restrict__ myCost,curandStatePhilox4_32_10_t *localState,
+__device__ void woa(int f,float * __restrict__ myData,float * __restrict__ myCost,curandState *localState,
     int current_iter,int * __restrict__ indexBest, float bound_low, float bound_high){
     
     /// Decreases linearly from 2 to 0

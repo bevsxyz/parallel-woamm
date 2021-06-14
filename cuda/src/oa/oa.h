@@ -14,17 +14,17 @@
 
 using namespace std;
         
-vector<float> run(int f, float l, float u);    
+vector<float> run(int f, float l, float u,float *device_solution);    
 __global__ void woam(unsigned int seed,int f,float l, float u, float*solution);
 
 __device__ void getBest(int * __restrict__ indexBest,float * __restrict__ costBest);
 
 __device__ void updatePop(int f,const int * __restrict__ random_particles,float * __restrict__ my_Data,
-float * __restrict__ my_cost, curandStatePhilox4_32_10_t *localState);
+float * __restrict__ my_cost, curandState *localState);
 
-__device__ void msos(int f,float * __restrict__ myData,float * __restrict__ cost,curandStatePhilox4_32_10_t *localState);
+__device__ void msos(int f,float * __restrict__ myData,float * __restrict__ cost,curandState *localState);
 
-__device__ void woa(int f,float * __restrict__ myData,float * __restrict__ cost,curandStatePhilox4_32_10_t *localState,
+__device__ void woa(int f,float * __restrict__ myData,float * __restrict__ cost,curandState *localState,
 int current_iter,int * __restrict__ indexBest,float bound_low, float bound_high);
 
 
