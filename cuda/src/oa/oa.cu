@@ -5,6 +5,7 @@
 #define dimension 30
 #define PI 3.14159265358979323846
 #define b 0.8
+#define blocks 1
 
 /// The main function to facilitiate memory copy and kernel calls
 /// @param f Function to be evaluvated
@@ -12,8 +13,6 @@
 /// @param u upper bound of the function
 /// @param device_solution The device array for solutions that is being reused
 vector<float> run(int f, float l, float u,float *device_solution){
-
-    int blocks = 1;
     int threads = 32;
     vector<float> global_best_solution;
 

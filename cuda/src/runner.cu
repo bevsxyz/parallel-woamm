@@ -1,5 +1,5 @@
 #include "runner.h"
-
+#define blocks 1
 
 using namespace std;
 
@@ -18,7 +18,7 @@ DataStats runFunc(int experiment, string func_name, int f, float l, float u){
 
 
     chrono::high_resolution_clock::time_point start_alloc = chrono::high_resolution_clock::now();
-    cudaMalloc((void**)&device_solution, 1* sizeof(float));
+    cudaMalloc((void**)&device_solution, blocks * sizeof(float));
     chrono::high_resolution_clock::time_point finish_alloc = chrono::high_resolution_clock::now();
     alloc_time = chrono::duration_cast<chrono::microseconds>(finish_alloc - start_alloc).count();
 
@@ -39,8 +39,13 @@ DataStats runFunc(int experiment, string func_name, int f, float l, float u){
     cudaFree(device_solution);
     finish_alloc = chrono::high_resolution_clock::now();
     alloc_time += chrono::duration_cast<chrono::microseconds>(finish_alloc - start_alloc).count();
-
-    cout << alloc_time << endl;
+    
+    if(f == 1){
+        ofstream file("./out/memory_alloc_dealloc_time.csv",std::ios_base::app);
+        file << alloc_time << endl;
+        file.close(); 
+    }
+    
 
     result.run();
     output_func(func_name,result,f_bests_history);
