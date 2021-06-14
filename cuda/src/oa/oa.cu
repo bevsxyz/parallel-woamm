@@ -39,7 +39,7 @@ vector<float> run(int f, float l, float u,float *device_solution){
 __global__ void woam(unsigned int seed,int f,float l, float u, float*solution){
     const int myID = threadIdx.x;
     const int bID  = blockIdx.x;
-    curandState localState;
+    curandStatePhilox4_32_10_t localState;
     curand_init(seed, /* the seed controls the sequence of random values that are produced */
         myID+(32*bID), /* the sequence number is only important with multiple cores */
         0, /* the offset is how much extra we advance in the sequence for each call, can be 0 */
@@ -102,7 +102,7 @@ __device__ __forceinline__ void getBest(int * __restrict__ indexBest,float * __r
 /// @param myCost Pointer for my cost
 /// @param localState MTGP32 PRG state
 __device__ void updatePop(int f,const int * __restrict__ random_particles,float * __restrict__ my_Data,
-    float * __restrict__ my_cost, curandState *localState){
+    float * __restrict__ my_cost, curandStatePhilox4_32_10_t *localState){
     
     float cost_rp[2],data_rp[dimension];
 
@@ -171,7 +171,7 @@ __device__ void updatePop(int f,const int * __restrict__ random_particles,float 
 /// @param myData Vector array of data of individual
 /// @param cost Cost of myData for the given function
 /// @param localState MTGP32 PRG state
-__device__ void msos(int f,float * __restrict__ myData,float * __restrict__ cost,curandState *localState){
+__device__ void msos(int f,float * __restrict__ myData,float * __restrict__ cost,curandStatePhilox4_32_10_t *localState){
     int random_particles[2];
     int my_index = threadIdx.x;
     random_particles[0] = int(curand_uniform(localState) * (psize-1))-1;
@@ -191,7 +191,7 @@ __device__ void msos(int f,float * __restrict__ myData,float * __restrict__ cost
 /// @param myData Vector array of data of individual
 /// @param cost Cost of myData for the given function
 /// @param localState MTGP32 PRG state
-__device__ void woa(int f,float * __restrict__ myData,float * __restrict__ myCost,curandState *localState,
+__device__ void woa(int f,float * __restrict__ myData,float * __restrict__ myCost,curandStatePhilox4_32_10_t *localState,
     int current_iter,int * __restrict__ indexBest, float bound_low, float bound_high){
     
     /// Decreases linearly from 2 to 0
