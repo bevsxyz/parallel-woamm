@@ -21,7 +21,7 @@ public:
 
 private:
     int max_iter = 30; /// Max iteration
-    float b = 0.8;
+    float b = 1;
     int psize = 32; /// Size of population
     int dimension = 30; /// Dimension
     Population population;

@@ -1,0 +1,185 @@
+\hypertarget{aim}{%
+\subsection{Aim}\label{aim}}
+
+To develop a parallel GPU implementation of the recently proposed
+Enhanced Whale Optimization Algorithm(WOAmM) and find speed-ups with
+benchmark functions.
+
+\hypertarget{background}{%
+\subsection{Background}\label{background}}
+
+The Whale Optimization Algorithm (WOA) is a meta-heuristic optimization
+algorithm developed by
+\protect\hyperlink{ref-mirjaliliWhaleOptimizationAlgorithm2016}{Mirjalili
+and Lewis}
+(\protect\hyperlink{ref-mirjaliliWhaleOptimizationAlgorithm2016}{2016}).
+It uses the humpback whales' hunting mechanism. Like most optimization
+algorithms, it works by spawning a population of agents and engaging
+them in exploration and exploitation phases. The exploratory phase helps
+to explore the search space extensively, whereas the exploitatory step
+refines promising solutions from the exploratory stage. Though
+effective, WOA may suffer from the low exploration of the search space.
+An enhanced WOA (WOAmM), proposed recently by
+\protect\hyperlink{ref-chakrabortyNovelEnhancedWhale2021}{Chakraborty et
+al.} (\protect\hyperlink{ref-chakrabortyNovelEnhancedWhale2021}{2021}),
+adds a modified mutualism phase of Symbiotic Organisms Search (SOS) to
+WOA to improve the exploration.
+
+Optimization problems are essential in engineering and science research,
+and parallelization of the same is of practical use.
+
+\renewcommand\tcap{WOAmM General Equations}
+
+\begin{longtable}[]{@{}ll@{}}
+\toprule
+No. & Equation \\
+\midrule
+\endhead
+& WOA:Searching the Prey \\
+1 & \(\overline{D}=| C\cdot P^{(k)}_{rnd}-P^{(k)}|\) \\
+2 & \(P^{(k+1)}=P^{(k)}_{rnd}-A\cdot \overline{D}\) \\
+3 & \(A = 2a_1 \times rnd - a_1\) \\
+4 & \(C = 2 \times rnd\) \\
+& WOA:Encircling the prey \\
+5 & \(\overline{D}=|C\cdot P^{(k)}_{best}-P^{(k)}|\) \\
+6 & \(P^{(k+1)}= P^{(k)}_{best}-A\cdot \overline{D}\) \\
+& WOA:Bubble-net attacking strategy \\
+7 & \(D^*= P^{(k)}_{best}-P^{(k)}\) \\
+8 &
+\(P^{(k+1)}= D^*\cdot e^{bl} \cdot \cos{2\pi l} + P^{(k)}_{best}\) \\
+9 & \(l = (a_2 - 1)rnd + 1\) \\
+& Modified Mutualism phase of SOS algorithm \\
+& \(P_s=min fitness(P_n,P_m)\) \\
+& \(P_r=max fitness(P_n,P_m)\) \\
+10 & \(P^{(k+1)}_i= P^{(k)}_i+rnd(0, 1)\cdot(P_s - MV\cdot BF1)\) \\
+11 & \(P^{(k+1)}_r= P^{(k)}_n+rnd(0, 1)\cdot(P_s - MV\cdot BF2)\) \\
+12 & \(MV = \frac{P_i+P_s}{2}\) \\
+13 & \(BF = round(1+rnd)\) \\
+\bottomrule
+\end{longtable}
+
+\hypertarget{strategy}{%
+\subsection{Strategy}\label{strategy}}
+
+From the pseudo-code available under with
+\protect\hyperlink{ref-chakrabortyNovelEnhancedWhale2021}{Chakraborty et
+al.} (\protect\hyperlink{ref-chakrabortyNovelEnhancedWhale2021}{2021}),
+we can identify regions amenable for parallelization. The outer main
+while loop has to be sequential, and hence there is no scope for
+parallel execution. Our next bet would be the two inner \texttt{for}
+loops corresponding to the populations. However, there is one caveat if
+we choose to parallelize these regions. Both component optimization
+algorithms update the individuals with a random individual selected from
+the population. The probability that a randomly selected individual has
+already been updated increases from 0 for the first individual to 1 for
+the last individual in serial execution. If we parallelize the algorithm
+overlooking this issue, we will end up reducing the stochasticity of
+exploration. We will revisit the problem in the end.
+
+A single block will execute the whole algorithm with threads equal to
+the population size. The pseudo-code available under Algorithm 1
+illustrates the strategy.
+
+\begin{algorithm}
+\SetAlgoLined
+ \# Start kernel from here for single warp\;
+ Initialize the population $P_i(i = 1,2\ldots n)$ in shared memory array\;
+ Calculate the fitness value of each \textit{search-agent}.\;
+ Find the best \textit{search-agent} $P_{best}$\;
+ Initialize $k = 0 \And \max_{iter}$\;
+ Copy the $P_i$ shared array to a local array\;
+ \While{$k \leq \max_{iter}$}{
+    \For{thread}{
+        Select two other \textit{search-agent} $(P_m \And P_n)$ randomly where $P_i \neq P_m \neq P_n$\;
+        Initialize array of indexes ind = $[P_m,P_n]$\;
+        Set int index = $P_m < P_n$\;
+        Calculate the new value of $P_i \And population[ind[index]]$ using eq.10 and eq.11\;
+        Calculate the fitness of $P_i^{k+1}$ and $P_m^{k+1}$ or $P_n^{k+1}$\;
+        Update the value of $P_i$ and $P_n$ or $P_m$ if the new fitness value is minimum (for minimization problem).\;
+    }
+    Syncronize local arrays\;
+    Calculate $P_{best}$\;
+    \#Procedure WOA starts from here\;
+    \For{every \textit{search-agent}}{
+        Update $A,C,l \And \beta$\;
+        \eIf{$\beta < 0.5$}{
+            Array = $[P_{rnd},P_{best}]$
+            Index int ind = $|A| \geq 1$
+            Update the position of current \textit{search-agent} by eq.2 or 6
+        }{
+            Update the position of current \textit{search-agent} by eq.8
+        }
+        Check boundary conditions\;
+    }
+    Syncronize local arrays\;
+    $k=k+1$
+ }
+ Return $P_{best}$
+ \caption{Pseudo-code of the GPU WOAmM algorithm.}
+\end{algorithm}
+
+\hypertarget{optimizations}{%
+\subsubsection{Optimizations}\label{optimizations}}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  Use floats for fitness calculation.
+\item
+  Will use the Cuda library for random numbers and use a global seed
+  with offsets for each thread.
+\item
+  The population size will be equal to the warp size 32.
+\item
+  The local copy of the population array is a trick to avoid bank
+  conflicts, which could be feasible since the population size is small.
+  The butterfly reduction with \_\_shfl\_xor\_sync() could be even fast
+  since it works between registers.
+\item
+  Within the device code, avoid pointer aliasing.
+\item
+  Two \texttt{if} predicates are reduced to min operations to avoid warp
+  divergence.
+\item
+  Rely on implicit synchronization within warp instead of the sync
+  operation.
+\end{enumerate}
+
+\hypertarget{improving-exploration}{%
+\subsubsection{Improving Exploration}\label{improving-exploration}}
+
+Few strategies to improve the stochasticity of the population, and
+thereby, the exploration phase follows.
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  Loop through each component OA within the while loop. Two iterations
+  could probably give us results similar to the sequential algorithm.
+\item
+  Run multiple blocks and take the best solution over from them.
+\item
+  Or a combination of above two.
+\end{enumerate}
+
+\hypertarget{references}{%
+\subsection*{References}\label{references}}
+\addcontentsline{toc}{subsection}{References}
+
+\hypertarget{refs}{}
+\begin{CSLReferences}{1}{0}
+\leavevmode\hypertarget{ref-chakrabortyNovelEnhancedWhale2021}{}%
+Chakraborty, Sanjoy, Apu Kumar Saha, Sushmita Sharma, Seyedali
+Mirjalili, and Ratul Chakraborty. 2021. {``A Novel Enhanced Whale
+Optimization Algorithm for Global Optimization.''} \emph{Computers \&
+Industrial Engineering} 153 (March): 107086.
+\url{https://doi.org/10.1016/j.cie.2020.107086}.
+
+\leavevmode\hypertarget{ref-mirjaliliWhaleOptimizationAlgorithm2016}{}%
+Mirjalili, Seyedali, and Andrew Lewis. 2016. {``The {Whale Optimization
+Algorithm}.''} \emph{Advances in Engineering Software} 95 (May): 51--67.
+\url{https://doi.org/10.1016/j.advengsoft.2016.01.008}.
+
+\end{CSLReferences}
