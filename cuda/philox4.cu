@@ -15,8 +15,9 @@
 #include <curand.h>
 #include <curand_kernel.h>
 
-#define fpsize 30
 #define PI 3.14159265358979323846
+
+/// Population size == to warp size
 #define psize 32
 #define dimension 30
 
@@ -182,7 +183,7 @@ __device__ void func(int f, const float * __restrict__ mydata,float * __restrict
 /// @param x Position vector of float
 __device__ float sphere(const float * __restrict__ x){
     float result = 0;
-    for (int i = 0; i < fpsize; i++){
+    for (int i = 0; i < dimension; i++){
         result += x[i] * x[i];
     }
     return result;
@@ -193,7 +194,7 @@ __device__ float sphere(const float * __restrict__ x){
 __device__ float rosenbrock(const float * __restrict__ x){
     float a[3];
     a[2] = 0;
-    for (int i = 0; i < fpsize - 1; i++){
+    for (int i = 0; i < dimension - 1; i++){
         a[0] = x[i] * x[i] - x[i+1];
         a[1] = 1.0 - x[i];
         a[2] += 100 * a[0] * a[0] + a[1] * a[1];
@@ -205,10 +206,10 @@ __device__ float rosenbrock(const float * __restrict__ x){
 /// @param x Position vector of float
 __device__ float rastrigin(const float * __restrict__ x){
     float result = 0;
-    for (int i = 0; i < fpsize ; i++){
+    for (int i = 0; i < dimension ; i++){
         result += x[i] * x[i] - 10.0 * __cosf(2 * PI * x[i]);
     }
-    return 10 * fpsize + result;
+    return 10 * dimension + result;
 }
 
 /// Function 4, Implementation of Griewangk function
@@ -217,7 +218,7 @@ __device__ float griewangk(const float * __restrict__ x){
     float sum = 0;
     float product = 1;
     float rec = 1 / 4000;
-    for (int i = 0; i < fpsize ; i++){
+    for (int i = 0; i < dimension ; i++){
         sum += x[i] * x[i] * rec;
         product *= __cosf(x[i]*rsqrtf(i+1));
     }
