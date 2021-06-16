@@ -150,7 +150,7 @@ int main(int argc, char *argv[]) {
     //---------------------------------------------------------------------------------------------
     
     // Save the allocation + deallocation times to a file
-    ofstream file("./out/memory_alloc_dealloc_time.csv");
+    ofstream file("./out/philox4/iterations-"+ to_string(result_best[0].iterations) + "/blocks-" + to_string(result_best[0].blocks) + "/" + "memory_alloc_dealloc_time.csv");
     file << alloc_time << endl;
     file.close(); 
     //---------------------------------------------------------------------------------------------
