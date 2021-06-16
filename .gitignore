@@ -1,2 +1,5 @@
 /cuda/build
 /sequential/build
+/cuda/out
+/sequential/out
+*.o
