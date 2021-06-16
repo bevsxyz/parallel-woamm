@@ -15,6 +15,11 @@
 #include <curand.h>
 #include <curand_kernel.h>
 
+/// include MTGP host helper functions
+#include <curand_mtgp32_host.h>
+/// include MTGP pre-computed parameter sets
+#include <curand_mtgp32dc_p_11213.h>
+
 #define PI 3.14159265358979323846
 
 /// Population size == to warp size
@@ -42,20 +47,20 @@ __device__ void func(int f, const float * __restrict__ mydata,float * __restrict
 /// WOAmM functions for GPU
 //-------------------------------------------------------------------------------------------------------
 
-vector<float> run(int f, float l, float u,float *device_solution,int blocks,int max_iter,curandStatePhilox4_32_10_t * __restrict__ global_state);    
-__global__ void woam(const int f,const float l, const float u, float*solution,const int max_iter,curandStatePhilox4_32_10_t * __restrict__ global_state);
+vector<float> run(int f, float l, float u,float *device_solution,int blocks,int max_iter,curandStateMtgp32 * __restrict__ global_state);    
+__global__ void woam(const int f,const float l, const float u, float*solution,const int max_iter,curandStateMtgp32 * __restrict__ global_state);
 
 __device__ void getBest(int * __restrict__ indexBest,float * __restrict__ costBest);
 
 __device__ void updatePop(const int myID,const int f,
     const int * __restrict__ random_particles,float * __restrict__ my_Data,
-    float * __restrict__ my_cost, curandStatePhilox4_32_10_t * __restrict__ localState);
+    float * __restrict__ my_cost, curandStateMtgp32 * __restrict__ localState);
 
 __device__ void msos(const int my_index,const int f,float * __restrict__ myData,
-    float * __restrict__ cost,curandStatePhilox4_32_10_t * __restrict__ localState);
+    float * __restrict__ cost,curandStateMtgp32 * __restrict__ localState);
 
 __device__ void woa(const int myID,const int f,float * __restrict__ myData,
-    float * __restrict__ cost,curandStatePhilox4_32_10_t * __restrict__ localState,
+    float * __restrict__ cost,curandStateMtgp32 * __restrict__ localState,
     const int current_iter,int * __restrict__ indexBest,
      const float bound_low, const float bound_high,const int max_iter);
 
@@ -77,7 +82,6 @@ public:
     int iterations;
     int blocks;
 
-
     void run();
 
 private:
@@ -92,7 +96,7 @@ private:
 /// Runner function for WOAmM
 //-------------------------------------------------------------------------------------------------------
 
-DataStats runFunc(int experiment, string func_name,int, float l, float u,int blocks,int max_iter,curandStatePhilox4_32_10_t *  __restrict__ global_state,float * device_solution);
+DataStats runFunc(int experiment, string func_name,int, float l, float u,int blocks,int max_iter,curandStateMtgp32 *  __restrict__ global_state,float * device_solution);
 
 void output_func(string func_name, DataStats result, vector<vector<float>> f_bests_history);
 
@@ -100,18 +104,6 @@ void output_all(vector<DataStats> result_best);
 
 //-------------------------------------------------------------------------------------------------------
 
-
-/// GPU kernel to initialise the RNG
-__global__ void setup_kernel(int seed,curandStatePhilox4_32_10_t *state)
-{
-    int id = threadIdx.x+(32*blockIdx.x);
-    /* Each thread gets same seed, a different sequence
-       number, no offset */
-    curand_init(seed, /* the seed controls the sequence of random values that are produced */
-    id, /* the sequence number is only important with multiple cores */
-    0, /* the offset is how much extra we advance in the sequence for each call, can be 0 */
-    &state[id]);
-}
 
 int main(int argc, char *argv[]) {
     int experiment = 50;// Each function is ran 50 times
@@ -124,14 +116,24 @@ int main(int argc, char *argv[]) {
     float alloc_time;
     float *device_solution;
 
-    curandStatePhilox4_32_10_t *global_state;
-
+    curandStateMtgp32 *global_state;
+    mtgp32_kernel_params *devKernelParams; /// Parameters for initialising PRG
 
     /// We keep track of the allocation times for RNG and float
     chrono::high_resolution_clock::time_point start_alloc = chrono::high_resolution_clock::now();
     cudaMalloc((void**)&device_solution, blocks * sizeof(float));
-    cudaMalloc((void**)&global_state, blocks * 32 * sizeof(curandStatePhilox4_32_10_t));
-    setup_kernel<<<blocks,psize>>>(time(NULL),global_state);
+    /// Allocate space for MTGP kernel parameters
+    cudaMalloc((void**)&devKernelParams, sizeof(mtgp32_kernel_params));
+    cudaMalloc((void**)&global_state, blocks * 32 * sizeof(curandStateMtgp32));
+    
+    /// Reformat from predefined parameter sets to kernel format,
+    /// and copy kernel parameters to device memory
+    curandMakeMTGP32Constants(mtgp32dc_params_fast_11213, devKernelParams);
+    
+    /// Initialize one state per thread block
+    curandMakeMTGP32KernelState(global_state, 
+                mtgp32dc_params_fast_11213, devKernelParams, blocks*32, time(NULL));
+
     chrono::high_resolution_clock::time_point finish_alloc = chrono::high_resolution_clock::now();
     alloc_time = chrono::duration_cast<chrono::microseconds>(finish_alloc - start_alloc).count();
     //---------------------------------------------------------------------------------------------
@@ -241,7 +243,7 @@ __device__ float griewangk(const float * __restrict__ x){
 /// @param max_iter The maximum number of iterations
 /// @param global_state The global state of RNG
 vector<float> run(int f, float l, float u,float *device_solution,int blocks,
-    int max_iter,curandStatePhilox4_32_10_t *  __restrict__ global_state){
+    int max_iter,curandStateMtgp32 *  __restrict__ global_state){
     vector<float> global_best_solution;
 
     float host_solution[blocks];
@@ -268,12 +270,12 @@ vector<float> run(int f, float l, float u,float *device_solution,int blocks,
 /// @param max_iter The maximum number of iterations
 /// @param global_state The global state of RNG
 __global__ void woam(const int f,const float l, const float u, float*solution,
-    const int max_iter,curandStatePhilox4_32_10_t *  __restrict__ global_state){
+    const int max_iter,curandStateMtgp32 *  __restrict__ global_state){
     const int myID = threadIdx.x;
     const int bID  = blockIdx.x;
 
     /// Copy state to local memory
-    curandStatePhilox4_32_10_t localState = global_state[myID+(32*bID)];
+    curandStateMtgp32 localState = global_state[myID+(32*bID)];
     float myData[dimension],cost,costBest;
     int indexBest=myID;
     for (int j = 0; j < dimension; j++){
@@ -331,7 +333,7 @@ __device__ __forceinline__ void getBest(int * __restrict__ indexBest,float * __r
 /// @param myCost Pointer for my cost
 /// @param localState RNG local state
 __device__ void updatePop(const int myID,const int f,const int * __restrict__ random_particles,float * __restrict__ my_Data,
-    float * __restrict__ my_cost, curandStatePhilox4_32_10_t *  __restrict__ localState){
+    float * __restrict__ my_cost, curandStateMtgp32 *  __restrict__ localState){
     
     float cost_rp[2],data_rp[dimension];
 
@@ -400,7 +402,7 @@ __device__ void updatePop(const int myID,const int f,const int * __restrict__ ra
 /// @param cost Cost of myData for the given function
 /// @param localState RNG local state
 __device__ void msos(const int my_index,const int f,float * __restrict__ myData,
-    float * __restrict__ cost,curandStatePhilox4_32_10_t *  __restrict__ localState){
+    float * __restrict__ cost,curandStateMtgp32 *  __restrict__ localState){
     int random_particles[2];
     random_particles[0] = int(curand_uniform(localState) * (psize-1))-1;
     if(random_particles[0] >= my_index)
@@ -425,7 +427,7 @@ __device__ void msos(const int my_index,const int f,float * __restrict__ myData,
 /// @param bound_high Upper bound of function
 /// @param max_iter The maximum number of iterations
 __device__ void woa(const int myID,const int f,float * __restrict__ myData,float * __restrict__ myCost,
-    curandStatePhilox4_32_10_t *  __restrict__ localState,const int current_iter,
+    curandStateMtgp32 *  __restrict__ localState,const int current_iter,
     int * __restrict__ indexBest, const float bound_low, const float  bound_high,const int max_iter){
     
     /// Decreases linearly from 2 to 0
@@ -504,7 +506,7 @@ __device__ void woa(const int myID,const int f,float * __restrict__ myData,float
 /// @param device_solution Float array for storing solution in GPU
 /// @return return result analysis
 DataStats runFunc(int experiment, string func_name, int f, float l, float u,int blocks,
-    int max_iter,curandStatePhilox4_32_10 *  __restrict__ global_state,float * device_solution){
+    int max_iter,curandStateMtgp32 *  __restrict__ global_state,float * device_solution){
     DataStats result;
     result.func_name = func_name;
     result.iterations = max_iter;
@@ -536,7 +538,7 @@ DataStats runFunc(int experiment, string func_name, int f, float l, float u,int 
 /// @param f_bests_history cost history
 void output_func(string func_name, DataStats result, vector<vector<float>> f_bests_history){
     /// output result stats
-    ofstream file("./out/philox4/iterations-"+ to_string(result.iterations) + "/blocks-" + to_string(result.blocks) + "/" + func_name + "_stats.csv");
+    ofstream file("./out/MTGP32/iterations-"+ to_string(result.iterations) + "/blocks-" + to_string(result.blocks) + "/" + func_name + "_stats.csv");
     file << "Mean,Median,Std,Range(low),Range(high),Time(microseconds)" << endl;
     file << result.mean << "," ;
     file << result.median << "," ;
@@ -547,7 +549,7 @@ void output_func(string func_name, DataStats result, vector<vector<float>> f_bes
     file.close();
 
     /// output time history
-    ofstream file_timeHistory("./out/philox4/iterations-"+ to_string(result.iterations) + "/blocks-" + to_string(result.blocks) + "/" + func_name + "_timeHistory.csv");
+    ofstream file_timeHistory("./out/MTGP32/iterations-"+ to_string(result.iterations) + "/blocks-" + to_string(result.blocks) + "/" + func_name + "_timeHistory.csv");
     for (int i = 0; i < result.time.size(); i++){
         if ( i == f_bests_history.size() - 1){
             file_timeHistory << result.time[i] << endl;
@@ -558,7 +560,7 @@ void output_func(string func_name, DataStats result, vector<vector<float>> f_bes
     file_timeHistory.close();
 
     /// output f history
-    ofstream file_fHistory("./out/philox4/iterations-"+ to_string(result.iterations) + "/blocks-" + to_string(result.blocks) + "/" + func_name + "_fHistory.csv");
+    ofstream file_fHistory("./out/MTGP32/iterations-"+ to_string(result.iterations) + "/blocks-" + to_string(result.blocks) + "/" + func_name + "_fHistory.csv");
     for (int i = 0; i < f_bests_history.size(); i++){
         for (int j = 0; j < f_bests_history[i].size(); j++) {
             if (j == f_bests_history[i].size() - 1) {
@@ -574,7 +576,7 @@ void output_func(string func_name, DataStats result, vector<vector<float>> f_bes
 /// write best result for every function
 /// @param result_best best result for each function
 void output_all(vector<DataStats> result_bests){
-    ofstream file("./out/philox4/iterations-"+ to_string(result_bests[0].iterations) + "/blocks-" + to_string(result_bests[0].blocks) + "/" + "woam_best_stats.csv");
+    ofstream file("./out/MTGP32/iterations-"+ to_string(result_bests[0].iterations) + "/blocks-" + to_string(result_bests[0].blocks) + "/" + "woam_best_stats.csv");
     file << "Function,Name,Mean,Median,Std,Range(low),Range(high),Time(microseconds)" << endl;
     for (int i = 0; i < result_bests.size(); i++){
         file << i + 1 << ",";
