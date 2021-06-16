@@ -19,13 +19,13 @@ using namespace std;
 /// @param l low x bound
 /// @param u up x bound
 /// @return return result analysis
-DataStats runFunc(int experiment, string func_name, float (*f)(vector<float> &), float l, float u,  randomUniform *rnd_global){
+DataStats runFunc(int experiment, string func_name, float (*f)(vector<float> &), float l, float u,  int iterations, randomUniform *rnd_global){
     DataStats result;
     result.func_name = func_name;
     vector<vector<float>> f_bests_history;
     float time_temp = 0;
 
-    WOAM woam_optimization(f, l, u, rnd_global);
+    WOAM woam_optimization(f, l, u,iterations ,rnd_global);
     for (int i = 0; i < experiment; i++){
         chrono::high_resolution_clock::time_point start = chrono::high_resolution_clock::now();
         vector<float> f_best_history = woam_optimization.run();

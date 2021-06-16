@@ -5,10 +5,11 @@
 #include <cmath>
 
 using namespace std;
-WOAM::WOAM(float (*f)(vector<float> &), float l, float u,  randomUniform *rnd_global){
+WOAM::WOAM(float (*f)(vector<float> &), float l, float u, int iterations, randomUniform *rnd_global){
     function = f;
     bound_low = l;
     bound_high = u;
+    max_iter = iterations;
     population.init(psize, dimension, f, l, u);
     rnd = rnd_global;
 }

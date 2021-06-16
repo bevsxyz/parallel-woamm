@@ -16,11 +16,11 @@ using namespace std;
 
 class WOAM{
 public:
-    WOAM(float (*f)(vector<float> &), float l, float u, randomUniform *rnd_global);
+    WOAM(float (*f)(vector<float> &), float l, float u, int iterations, randomUniform *rnd_global);
     vector<float> run();
 
 private:
-    int max_iter = 30; /// Max iteration
+    int max_iter; /// Max iteration
     float b = 1;
     int psize = 32; /// Size of population
     int dimension = 30; /// Dimension

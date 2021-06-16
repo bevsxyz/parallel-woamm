@@ -14,7 +14,8 @@
 
 using namespace std;
 
-DataStats runFunc(int experiment, string func_name, float (*f)(vector<float> &), float l, float u, randomUniform *rnd_global);
+DataStats runFunc(int experiment, string func_name, float (*f)(vector<float> &), float l, 
+float u,int iterations, randomUniform *rnd_global);
 
 void output_func(string func_name, DataStats result, vector<vector<float>> f_bests_history);
 
