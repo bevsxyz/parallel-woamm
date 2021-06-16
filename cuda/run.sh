@@ -1,18 +1,24 @@
 #!/bin/bash
 
-cd ./build/
+make clean
 
-cmake ..
+make
 
-cmake --build .
+rm -r ./out
 
-./whale_test
-
-> ./out/memory_alloc_dealloc_time.csv
-
-for i in {1..5}
+mkdir ./out
+for rng in philox4 MTGP32 MRG32k3a
 do
- ./whale_test
+    mkdir ./out/${rng}
+    for iterations in 30 100 300
+    do
+        mkdir ./out/${rng}/iterations-${iterations}
+        for block in 1 2 4 6
+        do
+            mkdir ./out/${rng}/iterations-${iterations}/blocks-${block}
+            
+            ./${rng} ${block} ${iterations}
+        done
+    done
 done
 
-cd ..
