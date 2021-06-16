@@ -17,6 +17,9 @@
 
 \lstset{language=C}
 
+\graphicspath{ {img/} }
+
+
 \begin{document}
 \title{Parallel Enhanced Whale Optimization Algorithm}
 
@@ -65,7 +68,7 @@ the original WOA and the Mutualism phase of the symbiotic organism search (mSOS)
 Sequential execution of WOAmM allowed data-dependent stochasticity for both components. 
 The probability that a randomly selected individual has already been updated increases from zero for the first individual to one for the last individual in serial WOAmM. 
 A parallel implementation of the algorithm will have to forsake this advantage. 
-But as would be later found, this is inconsequential for the optimization.
+But as would be later found, this is inconsequential for the optimization if we can assure the quality of random numbers.
 
 \subsection{Mutualism phase of the symbiotic organism search (mSOS) algorithm}
 
@@ -208,17 +211,64 @@ WOAmM is a stochastic algorithm and hence needs random numbers for execution.
 The state size of the Mersenne Twister 19937 generator (64 bit) that we use in a sequential program is 19937 bits or 2.5 kilobytes. 
 In parallel execution for thread safety, we need a state for each thread. 
 Hence the pseudo-random number generators like \lstinline{mt19937_64} from the CPU world are not ideal; the local memory for GPUs will become a bottleneck. 
-Therefore we have used \lstinline{XORWOW}, \lstinline{MRG32k3a}, and \lstinline{Philox_4x32_10} generators from \lstinline{curand_kernel.h} header, which is much leaner. 
-We initialized them within the CUDA kernel and used the sequence option to distribute states for individual threads.
-
+Therefore we have used two RNGs \lstinline{MRG32k3a}, and \lstinline{Philox_4x32_10}, with device API, which is much leaner and a  robust RNG from the Mersenne Twister family \lstinline{MTGP32} with host API.
+We initialized the device RNGs within the CUDA kernel and used the sequence option to distribute states for individual threads.  
+We initialized the host RNG from the CPU.
 
 \section{Experiments and Results}
 
 \subsection{Experiment Setup}
 
+Parallel WOAmM was evaluated by applying it to four well-known multi-variate functions selected from the original paper. 
+The sample included two unimodal (F1 and F2) and two multimodal (F3 and F4) functions with dimensions 30. 
+Further information regarding the functions is available in Table ~\ref{tbl:func}.
+
+\begin{table*}[!t]\renewcommand{\arraystretch}{1.3}
+\caption{Fixed dimension unimodal and multimodal functions.}
+\label{tbl:func}
+\centering
+\begin{tabular}{c||c||c||c||c||c||c}
+\hline\bfseries ID & \bfseries Function & \bfseries Equation & \bfseries Search Space & \bfseries Dimension D & \bfseries Optimum Value\\
+\hline
+\hline F1 & Sphere & \(F(x)=\sum_{k=1}^Dx_k^2\) & \([-100,100]\)&30&0\\
+\hline
+\hline F2 & Rosenbrock & \(F(x)=\sum_{k=1}^{D-1}[100(x_{k-1}-x_k^2)^2+(x_k-1)^2\) & \([-30,30]\)&30&0\\
+\hline
+\hline F3 & Rastrigin & \(F(x)=\sum_{k=1}^{D}[x_k^2-10\cos(2\Pi x)+10]\) & \([-5.12,5.12]\)&30&0\\
+\hline
+\hline F4 & Griewank & \(F(x)=\frac{1}{4000}\sum_{k=1}^{D}x_k^2-\prod_{k=1}^D\cos(\frac{x_k}{\sqrt{k}})+1\) & \([-600,600]\)&30&0\\
+\hline
+\end{tabular}
+\end{table*}
+
+For an optimization algorithm, while parallelizing, we have to focus on the accuracy of the result and execution speed. 
+We face two main challenges to achieve our goal. 
+We have to make up for the loss of data dependency and address the lower quality of GPU RNGs. 
+Hence for the experiments, we have varied three parameters. 
+They are as follows:
+
+\begin{enumerate}
+    \item Number of blocks that run simultaneously in a single experiment
+    \item Number of iterations of WOAmM
+    \item Types of RNGs.
+\end{enumerate}
+
+
+
+
 \subsection{Results}
 
-\section{Conclusions}
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=0.44\textwidth]{fitness}
+    \caption{The mean value of evaluated function with error bars. Optimal value is 0. Note sequential program(MT64 RNG) is included under MTGP32 for comparison as block 0.}
+\end{figure}
+
+\begin{figure}[ht]
+\centering
+\includegraphics[width=0.44\textwidth]{speed_up}
+\caption{Speed-ups of parallel implementations w.r.t. sequential program with 30 iterations and MT64 RNG}
+\end{figure}
 
 Have one para for conclusions and one para for future work.
 
