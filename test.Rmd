@@ -1,0 +1,70 @@
+
+```{r}
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+```
+
+
+```{R}
+sequential <- tibble()
+iterations <- c(30,100,300)
+for(i in iterations){
+  directory <- sprintf("./sequential/out/iteration-%g/woam_best_stats.csv", i)
+  temp <- read.csv(directory)
+  temp <- temp %>% mutate(iterations=i,block=0,RNG="MTGP32",SpeedUP=1)
+  sequential <- rbind(sequential, temp)
+}
+```
+
+
+```{r}
+data <- tibble()
+blocks <- c(1,2,4,6)
+RNG <- c("MTGP32", "MRG32k3a","philox4")
+for(r in RNG){
+  for(b in blocks){
+    for(i in iterations){
+      directory <- sprintf("./cuda/out/%s/iterations-%g/blocks-%g/woam_best_stats.csv", r,i,b)
+      temp <- read.csv(directory)
+      temp <- temp %>% mutate(iterations=i,block=b,RNG=r)
+      test=sequential %>% filter(iterations==i) %>% arrange(Function)
+      x = test[f,"Time.microseconds."]
+      temp <- temp %>% 
+        mutate(SpeedUP=case_when(Function == 1 ~test[1,"Time.microseconds."] / Time.microseconds.,
+                                 Function == 2 ~ test[2,"Time.microseconds."] / Time.microseconds.,
+                                Function == 3 ~test[3,"Time.microseconds."] / Time.microseconds.,
+                                Function == 4 ~test[4,"Time.microseconds."] / Time.microseconds.,))
+      data <- rbind(data, temp)
+    }
+  }
+}
+```
+
+```{r}
+full = rbind(data,sequential) 
+figure <- ggplot(full %>% filter(Function !=2), 
+                 aes(x = block,
+                     y = Mean,
+                     group= iterations,
+                     colour = factor(iterations))) +
+  geom_line() + geom_point() +
+  geom_errorbar(aes(ymin=Mean-(Std/50), ymax=Mean+(Std/50))) + facet_grid(RNG~Name)+ scale_color_discrete(name = "No. of Iterations") +
+  labs(x = "No. of Blocks", y = "Mean Minima")
+figure
+```
+
+```{r}
+figure <- ggplot(data%>%filter(Function != 2), 
+                 aes(x = block,
+                     y = SpeedUP,
+                     group= iterations,
+                     colour = factor(iterations))) + 
+  geom_line() + 
+  geom_point() +
+  facet_grid(RNG~Name) + scale_color_discrete(name = "No. of Iterations") +
+  labs(x = "No. of Blocks", y = "Speed Up w.r.t. Sequential")
+figure
+```
+
+
