@@ -14,8 +14,10 @@
 \usepackage{listings}
 \setlength{\belowdisplayskip}{0pt} \setlength{\belowdisplayshortskip}{0pt}
 \setlength{\abovedisplayskip}{0pt} \setlength{\abovedisplayshortskip}{0pt}
+\usepackage{makecell}
 
 \lstset{language=C}
+\newcommand\foo{\lstinline{t}}\newcommand\foobar[2][]{\lstinline[#1]{#2}}
 
 \graphicspath{ {img/} }
 
@@ -128,6 +130,13 @@ The vectors $A$, $C$, and $\overline{D}$ are calculated as follows:
 \end{eqnarray}
 \setlength{\arraycolsep}{0pt}
 
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=0.4\textwidth]{bubble-net}
+    \caption{Bubble-net feeding behavior of humpback whales.}
+    \label{fig:bubble-net}
+\end{figure}
+
 \subsubsection{Bubble-net attacking strategy}
 
 Humpback whales follow a surface feeding behavior known as bubble-net attack, where the whales move on a helix-shaped path. 
@@ -215,6 +224,25 @@ Therefore we have used two RNGs \lstinline{MRG32k3a}, and \lstinline{Philox_4x32
 We initialized the device RNGs within the CUDA kernel and used the sequence option to distribute states for individual threads.  
 We initialized the host RNG from the CPU.
 
+\begin{table*}[!t]\renewcommand{\arraystretch}{1.3}
+    \caption{Fixed dimension unimodal and multimodal functions.}
+    \label{tbl:func}
+    \centering
+    \begin{tabular}{c||c||c||c||c||c||c}
+    \hline\bfseries ID & \bfseries Function & \bfseries Equation & \bfseries Search Space & \bfseries Dimension D & \bfseries Optimum Value\\
+    \hline \multicolumn{6}{c}{Unimodal} \\
+    \hline F1 & Sphere & \(F(x)=\sum_{k=1}^Dx_k^2\) & \([-100,100]\)&30&0\\
+    \hline
+    \hline F2 & Rosenbrock & \(F(x)=\sum_{k=1}^{D-1}[100(x_{k-1}-x_k^2)^2+(x_k-1)^2\) & \([-30,30]\)&30&0\\
+    \hline
+    \hline \multicolumn{6}{c}{Multimodal} \\
+    \hline F3 & Rastrigin & \(F(x)=\sum_{k=1}^{D}[x_k^2-10\cos(2\Pi x)+10]\) & \([-5.12,5.12]\)&30&0\\
+    \hline
+    \hline F4 & Griewank & \(F(x)=\frac{1}{4000}\sum_{k=1}^{D}x_k^2-\prod_{k=1}^D\cos(\frac{x_k}{\sqrt{k}})+1\) & \([-600,600]\)&30&0\\
+    \hline
+\end{tabular}
+\end{table*}
+
 \section{Experiments and Results}
 
 \subsection{Experiment Setup}
@@ -223,46 +251,57 @@ Parallel WOAmM was evaluated by applying it to four well-known multi-variate fun
 The sample included two unimodal (F1 and F2) and two multimodal (F3 and F4) functions with dimensions 30. 
 Further information regarding the functions is available in Table ~\ref{tbl:func}.
 
-\begin{table*}[!t]\renewcommand{\arraystretch}{1.3}
-\caption{Fixed dimension unimodal and multimodal functions.}
-\label{tbl:func}
-\centering
-\begin{tabular}{c||c||c||c||c||c||c}
-\hline\bfseries ID & \bfseries Function & \bfseries Equation & \bfseries Search Space & \bfseries Dimension D & \bfseries Optimum Value\\
-\hline
-\hline F1 & Sphere & \(F(x)=\sum_{k=1}^Dx_k^2\) & \([-100,100]\)&30&0\\
-\hline
-\hline F2 & Rosenbrock & \(F(x)=\sum_{k=1}^{D-1}[100(x_{k-1}-x_k^2)^2+(x_k-1)^2\) & \([-30,30]\)&30&0\\
-\hline
-\hline F3 & Rastrigin & \(F(x)=\sum_{k=1}^{D}[x_k^2-10\cos(2\Pi x)+10]\) & \([-5.12,5.12]\)&30&0\\
-\hline
-\hline F4 & Griewank & \(F(x)=\frac{1}{4000}\sum_{k=1}^{D}x_k^2-\prod_{k=1}^D\cos(\frac{x_k}{\sqrt{k}})+1\) & \([-600,600]\)&30&0\\
-\hline
-\end{tabular}
-\end{table*}
-
 For an optimization algorithm, while parallelizing, we have to focus on the accuracy of the result and execution speed. 
-We face two main challenges to achieve our goal. 
-We have to make up for the loss of data dependency and address the lower quality of GPU RNGs. 
+Thus, we face two main challenges to achieve our goal. 
+First, we have to make up for the loss of data dependency and then address the lower quality of GPU RNGs. 
 Hence for the experiments, we have varied three parameters. 
 They are as follows:
 
 \begin{enumerate}
-    \item Number of blocks that run simultaneously in a single experiment
-    \item Number of iterations of WOAmM
     \item Types of RNGs.
+    \item Number of iterations of WOAmM
+    \item Number of blocks that run simultaneously in a single experiment
 \end{enumerate}
 
+The exact details of the parameters are available in Table ~\ref{tbl:parameters}.
 
+\begin{table}[!t]\renewcommand{\arraystretch}{1.3}
+    \caption{Parameters Varied in the Experiments}
+    \label{tbl:parameters}
+    \centering
+    \begin{tabular}{c||c}
+    \hline\bfseries Parameter & \bfseries Set\\
+    \hline
+    \hline RNG & \makecell{Host: \foobar[language=C]{\{MTGP32\}} \\ Device: \foobar[language=C]{\{MRG32k3a,Philox_4x32_10\}}}\\
+    \hline
+    \hline \# Iterations & \foobar[language=C]{\{30,100,300\}} \\
+    \hline
+    \hline \# Blocks & \foobar[language=C]{\{1,2,4,6\}} \\
+    \hline
+\end{tabular}
+\end{table}
 
+We implemented Parallel WOAmM, compared optimization efficiency with the sequential algorithm, and then analyzed the speed-up to the sequential algorithm with 30 iterations of WOAmM across all parameters. 
+All the experiments were performed with the GPU node of CDS Turing Cluster, with NVIDIA Tesla K40M GPU and Xeon E5 2620 V2 CPU with 24 GB memory.
 
-\subsection{Results}
+To effectively compare device RNGs with host RNG for the Parallel WOAmM, we have separated RNG state initialization from the actual execution of Parallel WOAmM. 
+Hence the memory allocation and RNG initialization times are not included in the total runtime of Parallel WOAmM. 
+However, the total runtime includes computation costs with memory copy call from device to host.
+
+The efficiency of Parallel WOAmM has been measured by comparing it to the sequential counterpart. For Parallel WOAmM, we collected data for executions with four functions by varying parameters. 
+Thus, each execution of the algorithm for a particular function was carried out 50 times.
 
 \begin{figure}[ht]
     \centering
     \includegraphics[width=0.44\textwidth]{fitness}
     \caption{The mean value of evaluated function with error bars. Optimal value is 0. Note sequential program(MT64 RNG) is included under MTGP32 for comparison as block 0.}
+    \label{fig:fitness}
 \end{figure}
+
+\subsection{Results}
+
+Figure ~\ref{fig:fitness} summarizes the optimization efficiency of the Parallel WOAmM compared against sequential execution for variable parameters. 
+We have excluded F2 from the results as the optimization of single block Parallel WOAmM with \lstinline{Philox_4x32_10} was significantly less efficient and hid the variations in other experiments.
 
 \begin{figure}[ht]
 \centering
