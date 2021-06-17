@@ -3,3 +3,4 @@
 /cuda/out
 /sequential/out
 *.o
+/presentation/_static
