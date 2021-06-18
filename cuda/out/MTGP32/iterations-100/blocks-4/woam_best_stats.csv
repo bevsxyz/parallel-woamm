@@ -1,0 +1,5 @@
+Function,Name,Mean,Median,Std,Range(low),Range(high),Time(microseconds)
+1,sphere,1.68324e-41,3.03802e-42,4.59107e-41,0,1.96042e-40,48606.1
+2,rosenbrock,28.995,28.9969,0.00848191,28.9626,28.9999,48641.1
+3,rastrigin,0,0,0,0,0,48822.2
+4,griewangk,0,0,0,0,0,48682.7
