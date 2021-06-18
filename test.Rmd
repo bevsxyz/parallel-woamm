@@ -66,4 +66,30 @@ figure <- ggplot(data%>%filter(Function != 2),
 figure
 ```
 
+```{r}
+final_table = data %>% select(Function,Mean,Range.low.,SpeedUP,iterations,block,RNG) %>% filter(Function!=2) #RNG=="MRG32k3a"
+colnames(final_table) <- c("Function", "Mean", "Best", "SpeedUp","Iterations","Blocks","RNG")
+final_table$Blocks <- as.integer(final_table$Blocks)
+```
+
+```{r}
+library(pivottabler)
+pt <- PivotTable$new()
+pt$addData(final_table)
+pt$addColumnDataGroups("Function",addTotal=FALSE)
+pt$addRowDataGroups("RNG",header="RNG",addTotal=FALSE)
+pt$addRowDataGroups("Blocks",addTotal=FALSE)
+pt$addRowDataGroups("Iterations",header="Iterations",addTotal=FALSE)
+pt$defineCalculation(calculationName="Mean", caption="Mean", 
+                     summariseExpression="mean(Mean)",format="%.1E")
+pt$defineCalculation(calculationName="Best", caption="Best",
+                     summariseExpression="mean(Best)",format="%.1E")
+pt$defineCalculation(calculationName="Speed-Up", caption="Speed-Up", 
+                     summariseExpression="mean(SpeedUp)",format="%.1f")
+#pt$renderPivot()
+```
+
+```{r}
+cat(pt$getLatex())
+```
 

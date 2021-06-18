@@ -15,6 +15,8 @@
 \setlength{\belowdisplayskip}{0pt} \setlength{\belowdisplayshortskip}{0pt}
 \setlength{\abovedisplayskip}{0pt} \setlength{\abovedisplayshortskip}{0pt}
 \usepackage{makecell}
+\usepackage{multirow}
+\usepackage{rotating}
 
 \lstset{language=C}
 \newcommand\foo{\lstinline{t}}\newcommand\foobar[2][]{\lstinline[#1]{#2}}
@@ -72,7 +74,7 @@ The probability that a randomly selected individual has already been updated inc
 A parallel implementation of the algorithm will have to forsake this advantage. 
 But as would be later found, this is inconsequential for the optimization if we can assure the quality of random numbers.
 
-\subsection{Mutualism phase of the symbiotic organism search (mSOS) algorithm}
+\subsection{Modified Mutualism phase of the symbiotic organism search (mSOS) algorithm}
 
 Mutualism is a two-way relationship between two organisms, where both of them benefitted from the interaction. 
 A typical example would be honey bees and flowers. 
@@ -180,9 +182,13 @@ We implement this strategy in WOA as:
         \For{every \textit{search-agent}}{
             Update $A,C,l \And \beta$\;
             \eIf{$\beta < 0.5$}{
-                Array = $[P_{rnd},P_{best}]$
-                Index int ind = $|A| \geq 1$
-                Update the position of current \textit{search-agent} by eq.2 or 6
+                \eIf{$|A| \geq 1$}{
+                    Select a random individual $P_{random}$
+                    Update the position of $P_i$ by eq 7 for $P_{random}$
+                }
+                {
+                    Update the position of $P_i$ by eq 7 for $P_{best}$
+                }
             }{
                 Update the position of current \textit{search-agent} by eq.8
             }
@@ -194,6 +200,22 @@ We implement this strategy in WOA as:
         Return $P_{best}$
         \caption{Parallel WOAmM for GPU.}
     \end{algorithm}
+
+    \begin{table*}[!t]\renewcommand{\arraystretch}{1}
+        \caption{Fixed dimension unimodal and multimodal functions.}
+        \label{tbl:func}
+        \centering
+        \begin{tabular}{|c|c|c|c|c|c|c|}
+        \hline\bfseries ID & \bfseries Function & \bfseries Equation & \bfseries Search Space & \bfseries Dimension D & \bfseries Optimum Value\\
+        \hline \multicolumn{6}{|c|}{Unimodal} \\
+        \hline F1 & Sphere & \(F(x)=\sum_{k=1}^Dx_k^2\) & \([-100,100]\)&30&0\\
+        \hline F2 & Rosenbrock & \(F(x)=\sum_{k=1}^{D-1}[100(x_{k-1}-x_k^2)^2+(x_k-1)^2\) & \([-30,30]\)&30&0\\
+        \hline \multicolumn{6}{|c|}{Multimodal} \\
+        \hline F3 & Rastrigin & \(F(x)=\sum_{k=1}^{D}[x_k^2-10\cos(2\Pi x)+10]\) & \([-5.12,5.12]\)&30&0\\
+        \hline F4 & Griewank & \(F(x)=\frac{1}{4000}\sum_{k=1}^{D}x_k^2-\prod_{k=1}^D\cos(\frac{x_k}{\sqrt{k}})+1\) & \([-600,600]\)&30&0\\
+        \hline
+    \end{tabular}
+    \end{table*}
 
 \subsection{Parallelization}
 
@@ -224,25 +246,6 @@ Therefore we have used two RNGs \lstinline{MRG32k3a}, and \lstinline{Philox_4x32
 We initialized the device RNGs within the CUDA kernel and used the sequence option to distribute states for individual threads.  
 We initialized the host RNG from the CPU.
 
-\begin{table*}[!t]\renewcommand{\arraystretch}{1.3}
-    \caption{Fixed dimension unimodal and multimodal functions.}
-    \label{tbl:func}
-    \centering
-    \begin{tabular}{c||c||c||c||c||c||c}
-    \hline\bfseries ID & \bfseries Function & \bfseries Equation & \bfseries Search Space & \bfseries Dimension D & \bfseries Optimum Value\\
-    \hline \multicolumn{6}{c}{Unimodal} \\
-    \hline F1 & Sphere & \(F(x)=\sum_{k=1}^Dx_k^2\) & \([-100,100]\)&30&0\\
-    \hline
-    \hline F2 & Rosenbrock & \(F(x)=\sum_{k=1}^{D-1}[100(x_{k-1}-x_k^2)^2+(x_k-1)^2\) & \([-30,30]\)&30&0\\
-    \hline
-    \hline \multicolumn{6}{c}{Multimodal} \\
-    \hline F3 & Rastrigin & \(F(x)=\sum_{k=1}^{D}[x_k^2-10\cos(2\Pi x)+10]\) & \([-5.12,5.12]\)&30&0\\
-    \hline
-    \hline F4 & Griewank & \(F(x)=\frac{1}{4000}\sum_{k=1}^{D}x_k^2-\prod_{k=1}^D\cos(\frac{x_k}{\sqrt{k}})+1\) & \([-600,600]\)&30&0\\
-    \hline
-\end{tabular}
-\end{table*}
-
 \section{Experiments and Results}
 
 \subsection{Experiment Setup}
@@ -269,13 +272,10 @@ The exact details of the parameters are available in Table ~\ref{tbl:parameters}
     \caption{Parameters Varied in the Experiments}
     \label{tbl:parameters}
     \centering
-    \begin{tabular}{c||c}
+    \begin{tabular}{|c|c|}
     \hline\bfseries Parameter & \bfseries Set\\
-    \hline
     \hline RNG & \makecell{Host: \foobar[language=C]{\{MTGP32\}} \\ Device: \foobar[language=C]{\{MRG32k3a,Philox_4x32_10\}}}\\
-    \hline
     \hline \# Iterations & \foobar[language=C]{\{30,100,300\}} \\
-    \hline
     \hline \# Blocks & \foobar[language=C]{\{1,2,4,6\}} \\
     \hline
 \end{tabular}
@@ -284,32 +284,111 @@ The exact details of the parameters are available in Table ~\ref{tbl:parameters}
 We implemented Parallel WOAmM, compared optimization efficiency with the sequential algorithm, and then analyzed the speed-up to the sequential algorithm with 30 iterations of WOAmM across all parameters. 
 All the experiments were performed with the GPU node of CDS Turing Cluster, with NVIDIA Tesla K40M GPU and Xeon E5 2620 V2 CPU with 24 GB memory.
 
+  \begin{table*}[!t]\renewcommand{\arraystretch}{0.9}
+    \centering
+    \caption{Optimization and Speed-Ups with Parallel WOAmM}
+    \label{tbl:result}
+    \begin{tabular}{|l|l|l|rrr|rrr|rrr|}
+      \hline
+
+      \multirow{2}*{\begin{turn}{90}RNG\end{turn}}
+      & \multirow{2}*{\begin{turn}{90}Blocks\end{turn}}
+        & \multirow{2}*{Iteration}
+
+       & \multicolumn{3}{|c|}{F1 Sphere} & \multicolumn{3}{|c|}{F3 Rastrigin} & \multicolumn{3}{|c|}{F4 Griewank}\\
+      \cline{4-12}
+      && & Mean & Best & Speed-Up & Mean & Best & Speed-Up & Mean & Best & Speed-Up\\
+      \hline
+      \multirow{12}{*}{\begin{turn}{90}MRG32k3a\end{turn}} & \multirow{3}{*}{1} & 30  & 3.8E+00 & 2.5E-03 & 27.9 & 3.6E+00 & 3.6E-03 & 39.8 & 1.0E+00 & 9.9E-01 & 57.0\\
+      & & 100  & 1.5E-10 & 8.2E-20 & 8.7 & 4.2E-05 & 0.0E+00 & 12.2 & 3.1E-02 & 0.0E+00 & 17.6\\
+      & & 300  & 6.2E-43 & 0.0E+00 & 2.9 & 6.1E-07 & 0.0E+00 & 4.1 & 2.4E-09 & 0.0E+00 & 5.9\\
+      \cline{2-12}
+      & \multirow{3}{*}{2} & 30  & 2.0E-01 & 4.2E-04 & 27.9 & 6.5E-01 & 2.7E-04 & 39.9 & 9.9E-01 & 7.9E-01 & 57.1\\
+      & & 100  & 5.8E-12 & 8.4E-19 & 8.6 & 0.0E+00 & 0.0E+00 & 12.2 & 1.7E-04 & 6.0E-08 & 17.6\\
+      & & 300  & 0.0E+00 & 0.0E+00 & 2.9 & 0.0E+00 & 0.0E+00 & 4.1 & 0.0E+00 & 0.0E+00 & 5.9\\
+      \cline{2-12}
+      & \multirow{3}{*}{4} & 30  & 7.4E-02 & 4.2E-04 & 27.6 & 2.3E-01 & 2.4E-04 & 39.4 & 9.7E-01 & 6.0E-01 & 56.5\\
+      & & 100  & 3.3E-14 & 3.2E-20 & 8.6 & 6.1E-07 & 0.0E+00 & 12.1 & 1.0E-06 & 0.0E+00 & 17.4\\
+      & & 300  & 0.0E+00 & 0.0E+00 & 2.9 & 0.0E+00 & 0.0E+00 & 4.0 & 0.0E+00 & 0.0E+00 & 5.8\\
+      \cline{2-12}
+      & \multirow{3}{*}{6} & 30  & 1.6E-02 & 8.6E-05 & 27.6 & 3.9E-02 & 4.6E-04 & 39.4 & 9.8E-01 & 7.8E-01 & 56.4\\
+      & & 100  & 2.3E-15 & 2.7E-19 & 8.6 & 0.0E+00 & 0.0E+00 & 12.0 & 4.0E-07 & 0.0E+00 & 17.4\\
+      & & 300  & 0.0E+00 & 0.0E+00 & 2.9 & 0.0E+00 & 0.0E+00 & 4.0 & 0.0E+00 & 0.0E+00 & 5.8\\
+      \cline{1-12}
+      \multirow{12}{*}{\begin{turn}{90}MTGP32\end{turn}} & \multirow{3}{*}{1} & 30  & 9.9E-28 & 1.8E-31 & 2.5 & 0.0E+00 & 0.0E+00 & 4.5 & 0.0E+00 & 0.0E+00 & 5.4\\
+      & & 100  & 3.0E-35 & 3.0E-43 & 0.8 & 0.0E+00 & 0.0E+00 & 1.4 & 0.0E+00 & 0.0E+00 & 1.7\\
+      & & 300  & 0.0E+00 & 0.0E+00 & 0.3 & 0.0E+00 & 0.0E+00 & 0.5 & 0.0E+00 & 0.0E+00 & 0.6\\
+      \cline{2-12}
+      & \multirow{3}{*}{2} & 30  & 1.9E-20 & 6.1E-28 & 2.4 & 0.0E+00 & 0.0E+00 & 4.4 & 0.0E+00 & 0.0E+00 & 5.4\\
+      & & 100  & 0.0E+00 & 0.0E+00 & 0.8 & 0.0E+00 & 0.0E+00 & 1.4 & 0.0E+00 & 0.0E+00 & 1.7\\
+      & & 300  & 0.0E+00 & 0.0E+00 & 0.3 & 0.0E+00 & 0.0E+00 & 0.5 & 0.0E+00 & 0.0E+00 & 0.6\\
+      \cline{2-12}
+      & \multirow{3}{*}{4} & 30  & 2.5E-17 & 3.8E-29 & 2.5 & 3.7E-06 & 0.0E+00 & 4.5 & 0.0E+00 & 0.0E+00 & 5.4\\
+      & & 100  & 1.7E-41 & 0.0E+00 & 0.8 & 0.0E+00 & 0.0E+00 & 1.4 & 0.0E+00 & 0.0E+00 & 1.7\\
+      & & 300  & 0.0E+00 & 0.0E+00 & 0.3 & 0.0E+00 & 0.0E+00 & 0.5 & 0.0E+00 & 0.0E+00 & 0.6\\
+      \cline{2-12}
+      & \multirow{3}{*}{6} & 30  & 2.4E-16 & 1.1E-21 & 2.4 & 0.0E+00 & 0.0E+00 & 4.3 & 0.0E+00 & 0.0E+00 & 5.2\\
+      & & 100  & 0.0E+00 & 0.0E+00 & 0.7 & 0.0E+00 & 0.0E+00 & 1.3 & 0.0E+00 & 0.0E+00 & 1.6\\
+      & & 300  & 0.0E+00 & 0.0E+00 & 0.2 & 0.0E+00 & 0.0E+00 & 0.4 & 0.0E+00 & 0.0E+00 & 0.5\\
+      \cline{1-12}
+      \multirow{12}{*}{\begin{turn}{90}\foobar[language=C]{Philox_4x32_10}\end{turn}} & \multirow{3}{*}{1} & 30  & 1.1E+01 & 1.4E-03 & 22.4 & 8.1E+00 & 4.0E-04 & 35.8 & 1.0E+00 & 9.7E-01 & 45.3\\
+      & & 100  & 1.5E-10 & 4.6E-19 & 6.9 & 2.1E-05 & 0.0E+00 & 11.0 & 2.4E-02 & 6.0E-08 & 13.9\\
+      & & 300  & 2.3E-40 & 0.0E+00 & 2.3 & 2.4E-06 & 0.0E+00 & 3.7 & 3.6E-09 & 0.0E+00 & 4.7\\
+      \cline{2-12}
+      & \multirow{3}{*}{2} & 30  & 2.3E-01 & 8.4E-04 & 22.3 & 6.1E-01 & 8.9E-04 & 35.8 & 9.8E-01 & 6.8E-01 & 45.3\\
+      & & 100  & 9.7E-13 & 5.8E-20 & 6.9 & 0.0E+00 & 0.0E+00 & 11.0 & 1.8E-03 & 0.0E+00 & 13.9\\
+      & & 300  & 0.0E+00 & 0.0E+00 & 2.3 & 0.0E+00 & 0.0E+00 & 3.7 & 0.0E+00 & 0.0E+00 & 4.7\\
+      \cline{2-12}
+      & \multirow{3}{*}{4} & 30  & 6.3E-02 & 1.9E-04 & 22.1 & 1.2E-01 & 1.0E-03 & 35.4 & 9.7E-01 & 2.8E-01 & 44.8\\
+      & & 100  & 1.5E-14 & 1.6E-19 & 6.8 & 0.0E+00 & 0.0E+00 & 10.9 & 5.1E-07 & 0.0E+00 & 13.7\\
+      & & 300  & 0.0E+00 & 0.0E+00 & 2.3 & 0.0E+00 & 0.0E+00 & 3.7 & 0.0E+00 & 0.0E+00 & 4.6\\
+      \cline{2-12}
+      & \multirow{3}{*}{6} & 30  & 4.1E-02 & 7.4E-04 & 22.2 & 4.9E-02 & 1.4E-03 & 35.5 & 9.5E-01 & 4.6E-01 & 44.8\\
+      & & 100  & 4.5E-15 & 1.3E-19 & 6.8 & 0.0E+00 & 0.0E+00 & 10.9 & 3.8E-07 & 0.0E+00 & 13.7\\
+      & & 300  & 0.0E+00 & 0.0E+00 & 2.3 & 0.0E+00 & 0.0E+00 & 3.7 & 0.0E+00 & 0.0E+00 & 4.6\\
+      \hline
+    \end{tabular}
+  \end{table*}
+
+
 To effectively compare device RNGs with host RNG for the Parallel WOAmM, we have separated RNG state initialization from the actual execution of Parallel WOAmM. 
 Hence the memory allocation and RNG initialization times are not included in the total runtime of Parallel WOAmM. 
 However, the total runtime includes computation costs with memory copy call from device to host.
 
-The efficiency of Parallel WOAmM has been measured by comparing it to the sequential counterpart. For Parallel WOAmM, we collected data for executions with four functions by varying parameters. 
+The efficiency of Parallel WOAmM has been measured by comparing it to the sequential counterpart with 30 iterations
+\footnote{Thirty iterations alone give good optimization for the sequential algorithm.}. 
+For Parallel WOAmM, we collected data for executions with four functions by varying parameters. 
 Thus, each execution of the algorithm for a particular function was carried out 50 times.
 
 \begin{figure}[ht]
     \centering
     \includegraphics[width=0.44\textwidth]{fitness}
-    \caption{The mean value of evaluated function with error bars. Optimal value is 0. Note sequential program(MT64 RNG) is included under MTGP32 for comparison as block 0.}
+    \caption{The mean value of evaluated function with error bars. Note sequential program(MT64 RNG) is included under MTGP32 for comparison as block 0.}
     \label{fig:fitness}
 \end{figure}
 
 \subsection{Results}
 
-Figure ~\ref{fig:fitness} summarizes the optimization efficiency of the Parallel WOAmM compared against sequential execution for variable parameters. 
-We have excluded F2 from the results as the optimization of single block Parallel WOAmM with \lstinline{Philox_4x32_10} was significantly less efficient and hid the variations in other experiments.
+Fig ~\ref{fig:fitness} summarizes the optimization efficiency of the Parallel WOAmM compared against sequential execution for variable parameters. 
+\footnote{We included F2 in our experiments because it performed worse with sequential WOAmM; it was a reasonable control. 
+But we had to exclude it  from our analysis because it gave results three orders of magnitude worse than the sequential optimization with single block Parallel WOAmM and \lstinline{Philox_4x32_10} RNG.}
+Our reservations against the GPU RNGs were not unwarranted. 
+From Fig ~\ref{fig:fitness} and ~\ref{fig:speed}, we see that the CPU RNG gives the most optimal value but with considerably low speedups(in the range $(0.5,5.5)$). 
+\lstinline{MRG32k3a} gave much better optimization among the two GPU RNGs, pointing to a much better bargain with randomness quality and RNG state size. 
 
 \begin{figure}[ht]
 \centering
 \includegraphics[width=0.44\textwidth]{speed_up}
 \caption{Speed-ups of parallel implementations w.r.t. sequential program with 30 iterations and MT64 RNG}
+\label{fig:speed}
 \end{figure}
 
-Have one para for conclusions and one para for future work.
+As expected, speed-ups remain relatively constant when increasing the number of blocks. 
+Further, although it depends on the specific function we are evaluating, we find MRG32k3a with 100 iterations and four blocks of GPU threads to give good optimization and speedup.
+
+For future works on Parallel WOAmM, we wish to experiment with more GPU RNGs with a good balance between randomness quality and size.  
+We find a variant of WOA, CWOA\cite{10.1016/j.jcde.2017.12.006}, which uses chaotic maps instead of random numbers lucrative. 
+It would be interesting to see if parallel execution-friendly chaotic maps exist in literature.
 
 \bibliographystyle{IEEEtran}
 \bibliography{bevan_report}

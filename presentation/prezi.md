@@ -4,7 +4,7 @@ theme: simple
 author: Bevan Stanely
 ---
 
-## Parallel Enhanced Whale Optimization Algorithm
+## Parallel Enhanced Whale Optimization Algorithm In CUDA
 
 By Bevan Stanely https://bevs.xyz/
 
@@ -42,7 +42,7 @@ Note: Inspired by the bubble-net feeding behavior of humpback whales
 - Slow convergence speed
 - Sticking with local solution easily.
 
-WOAmM
+WOAmM<!-- .element: class="fragment"-->
 
 Note:
 
@@ -52,10 +52,10 @@ Addresses these drawbacks
 
 ---
 
-We want to develop a Parallel WOAmM with SpeedUPs
+We want to develop a Parallel WOAmM with SpeedUPs in GPU
 
-- Quality and size of RNGs
-- Data dependencies
+- Quality and size of RNGs<!-- .element: class="fragment"-->
+- Data dependencies<!-- .element: class="fragment"-->
 
 Note:
 
@@ -95,20 +95,29 @@ Note:
 - BF = 1 or 2
 - MV mean(pi,ps)
 
+THis allows them to explore their local space
+
 ----
 
 ## WOA
 
 ![](img/bubble-net.png)
 
+Note:
+
+- Randomly searching the prey
+- Encircling the prey
+- Bubble-net attacking strategy
+  - Assume current best solution to be optimum and attack it
+
 ---
 
 ## How to Parallelise?
 
-- Model individuals as GPU threads
-- Intra-warp Communication with Butterfly reduction
-- Avoiding Warp Divergence
-- Random Numbers
+- Model individuals as GPU threads<!-- .element: class="fragment"-->
+- Intra-warp Communication with Butterfly reduction<!-- .element: class="fragment"-->
+- Avoiding Warp Divergence<!-- .element: class="fragment"-->
+- Random Numbers<!-- .element: class="fragment"-->
 
 ```C
 for(each thread in warp) do{
@@ -118,10 +127,18 @@ for(each thread in warp) do{
         k++;
     }
 }
-
+return best solution
 ```
 
 Note:
+
+We wanted to capitalize the warp level primitives, and hence fixed the population size to the warp size
+
+Direct communication to communicate position vectors
+
+Threads in a warp execute instructions in sync at every instant
+
+We had 3 data dependent if else conditions
 
 - Intra warp communication is faster than shared memory
 - If else conditions have been avoided by using pointer arrays
@@ -159,6 +176,14 @@ Note:
 
 The parallel implementation across all parameters was compared with sequential algorithm for their optimization quality.
 
+Ive ignored rosenbrock because it did really bad for single block
+
+The GPU RNGs did bad in single block and 30 iterations
+
+Increasing block size had some effect upto 4 blocks
+
+But increasing iterations were more effective
+
 ---
 
 ![](./img/speed_up.png)
@@ -169,11 +194,17 @@ Note:
 
 The parallel implementation across all parameters was compared with sequential algorithm for their speedUp.
 
+The speed up remains constant when increasing number of blocks
+
 ---
 
+## Future Direction
+
+- Search for better GPU RNGs
 - Chaotic Maps instead of RNG
 
 ---
 
 ## ThanK U
 
+https://bevs.xyz/
