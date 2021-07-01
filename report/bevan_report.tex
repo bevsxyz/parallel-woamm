@@ -199,6 +199,7 @@ We implement this strategy in WOA as:
         }
         Return $P_{best}$
         \caption{Parallel WOAmM for GPU.}
+        \label{alg:1}
     \end{algorithm}
 
     \begin{table*}[!t]\renewcommand{\arraystretch}{1}
@@ -219,7 +220,7 @@ We implement this strategy in WOA as:
 
 \subsection{Parallelization}
 
-For parallelization, we employed CUDA under GPU. 
+For parallelization, we employed CUDA under GPU (Algorithm ~\ref{alg:1}). 
 We modeled the individuals $P_i$ of the population as GPU threads and stored the population data and its fitness in the thread’s local memory (register). 
 To capitalize on the wrap level communication offered, we fixed the population size $n$ to the warp size 32, allowing communication of population data without involving the slow shared memory. 
 A single kernel executed the complete WOAmM algorithm within a thread warp.
