@@ -2,6 +2,7 @@
 
 rm -r ./out
 mkdir ./out
+mkdir -p build
 
 cd ./build
 
@@ -9,10 +10,10 @@ rm -r ./*
 
 mkdir ./out
 
-cmake3 ..
+cmake ..
 
 
-cmake3 --build .
+cmake --build .
 
 for iterations in 30 100 300
 do
